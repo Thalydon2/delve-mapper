@@ -1005,11 +1005,9 @@ function renderLayers() {
       ? '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>'
       : '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.4"/></svg>';
     eye.addEventListener("click", ev => { ev.stopPropagation(); begin(); L.visible = !L.visible; renderLayers(); changed(); });
-    const name = document.createElement("input");
-    name.type = "text"; name.value = L.name; name.className = "lname"; name.setAttribute("aria-label", "Layer name");
-    name.addEventListener("focus", () => { if (L.id !== activeId) selectLayer(L.id, true); });
-    name.addEventListener("change", () => { const v = name.value.trim(); if (v && v !== L.name) { begin(); L.name = v; saveLocal(); syncStyleUI(); } else name.value = L.name; });
-    name.addEventListener("keydown", ev => { if (ev.key === "Enter") { name.dispatchEvent(new Event("change")); appEl.focus({ preventScroll: true }); } ev.stopPropagation(); });
+    const name = document.createElement("span");
+    name.className = "lname"; name.textContent = L.name; name.title = "Double-click to rename";
+    name.addEventListener("dblclick", ev => { ev.stopPropagation(); startRename(L, name); });
     const count = document.createElement("span");
     count.className = "lcount"; count.textContent = L.cells.size ? L.cells.size + " sq" : "empty";
     row.append(eye, name, count);
@@ -1020,12 +1018,36 @@ function renderLayers() {
   const i = layers.findIndex(L => L.id === activeId);
   $("layerUp").disabled = i >= layers.length - 1; $("layerDown").disabled = i <= 0; $("layerDel").disabled = layers.length <= 1;
 }
-function selectLayer(id, keepFocus) { setActive(id); syncStyleUI(); if (!keepFocus) renderLayers(); else layerList.querySelectorAll(".layer").forEach(r => r.classList.toggle("active", +r.dataset.id === id)); updateHud(); }
+// Selecting only restyles the rows (no redraw), so a double-click lands on the same element twice.
+function selectLayer(id) {
+  if (id === activeId) return;
+  setActive(id); syncStyleUI();
+  layerList.querySelectorAll(".layer").forEach(r => r.classList.toggle("active", +r.dataset.id === id));
+  const i = layers.findIndex(L => L.id === activeId);
+  $("layerUp").disabled = i >= layers.length - 1; $("layerDown").disabled = i <= 0;
+  updateHud();
+}
+function startRename(L, span) {
+  if (!span || !span.isConnected) return;
+  const input = document.createElement("input");
+  input.type = "text"; input.value = L.name; input.className = "lname editing"; input.setAttribute("aria-label", "Layer name");
+  span.replaceWith(input); input.focus(); input.select();
+  let done = false;
+  const finish = save => {
+    if (done) return; done = true;
+    const v = input.value.trim();
+    if (save && v && v !== L.name) { begin(); L.name = v; saveLocal(); syncStyleUI(); }
+    renderLayers(); appEl.focus({ preventScroll: true });
+  };
+  input.addEventListener("keydown", ev => { ev.stopPropagation(); if (ev.key === "Enter") finish(true); else if (ev.key === "Escape") finish(false); });
+  input.addEventListener("blur", () => finish(true));
+  for (const t of ["click", "dblclick", "pointerdown"]) input.addEventListener(t, ev => ev.stopPropagation());
+}
 $("layerAdd").addEventListener("click", () => {
   begin();
   const cur = activeLayer(), L = makeLayer("Layer " + (layers.length + 1), cur ? cur.style : DEFAULT_STYLE);
   layers.splice(layers.indexOf(cur) + 1, 0, L); setActive(L.id); renderLayers(); syncStyleUI(); changed();
-  const inp = layerList.querySelector('.layer.active .lname'); if (inp) { inp.focus(); inp.select(); }
+  startRename(L, layerList.querySelector('.layer.active .lname'));
 });
 function moveLayer(dir) {
   const i = layers.findIndex(L => L.id === activeId), j = i + dir;

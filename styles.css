@@ -112,9 +112,8 @@
 .dm-root .layer.hidden-layer .lname, .dm-root .layer.hidden-layer .lcount { opacity: .5; }
 .dm-root .app .layer .eye { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .dm-root .app .layer .eye:hover { background: var(--surface); color: var(--fg); }
-.dm-root .layer .lname { flex: 1; min-width: 0; height: 28px; border: 1px solid transparent; background: transparent; border-radius: 6px; padding: 0 6px; font-size: 13px; color: var(--fg); }
-.dm-root .layer .lname:hover { border-color: var(--line); }
-.dm-root .layer .lname:focus { border-color: var(--accent); background: var(--surface); outline: none; }
+.dm-root .layer .lname { flex: 1; min-width: 0; height: 28px; line-height: 26px; border: 1px solid transparent; border-radius: 6px; padding: 0 6px; font-size: 13px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; }
+.dm-root .layer input.lname { border-color: var(--accent); background: var(--surface); outline: none; user-select: text; line-height: normal; }
 .dm-root .layer .lcount { font-family: var(--f-mono); font-size: 11px; color: var(--muted); flex: none; }
 .dm-root .layer-actions { display: grid; grid-template-columns: 1fr auto auto 1fr; gap: 6px; }
 .dm-root .app .btn.icon { width: 36px; padding: 0; }
