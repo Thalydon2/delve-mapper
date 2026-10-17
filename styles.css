@@ -22,7 +22,9 @@
 .dm-root .app { outline: none; }
 .dm-root * { box-sizing: border-box; }
 .dm-root button, .dm-root select, .dm-root input { font: inherit; color: inherit; }
-.dm-root button { box-shadow: none; }
+.dm-root .app button { box-shadow: none; height: auto; min-height: 0; line-height: 1.2; white-space: normal; }
+.dm-root .app .swatch, .dm-root .app .pbtn { justify-content: flex-start; align-items: stretch; }
+.dm-root .app .pbtn { align-items: center; }
 .dm-root button { cursor: pointer; }
 .dm-root :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -37,7 +39,7 @@
 .dm-root .tools { display: flex; gap: 4px; overflow-x: auto; min-width: 0; scrollbar-width: none; padding: 2px; }
 .dm-root .tools::-webkit-scrollbar { display: none; }
 .dm-root .sep { width: 1px; align-self: stretch; background: var(--line); margin: 4px 2px; flex: none; }
-.dm-root .tbtn {
+.dm-root .app .tbtn {
   display: inline-flex; align-items: center; gap: 6px; flex: none;
   height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid transparent; background: transparent;
   font-size: 13px; font-weight: 500; color: var(--muted);
@@ -47,7 +49,7 @@
 .dm-root .tbtn:disabled { opacity: .4; cursor: default; }
 .dm-root .tbtn kbd { font-family: var(--f-mono); font-size: 10px; color: var(--muted); opacity: .8; }
 .dm-root .spacer { flex: 1; }
-.dm-root .style-toggle { display: none; }
+.dm-root .app .style-toggle { display: none; }
 
 .dm-root .stage { position: relative; min-width: 0; min-height: 0; background: var(--stage); overflow: hidden; touch-action: none; }
 .dm-root canvas[data-dm="map"] { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -61,7 +63,7 @@
   position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 2px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px;
 }
-.dm-root .zoom button { width: 30px; height: 28px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); }
+.dm-root .app .zoom button { width: 30px; height: 28px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); }
 .dm-root .zoom button:hover { background: var(--surface-2); color: var(--fg); }
 .dm-root .zoom span { font-family: var(--f-mono); font-size: 11px; min-width: 44px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dm-root .toast {
@@ -92,7 +94,7 @@
 .dm-root .row output { font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dm-root input[type="range"] { width: 100%; accent-color: var(--accent); }
 .dm-root input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
-.dm-root .btn {
+.dm-root .app .btn {
   height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-size: 13px; font-weight: 500; padding: 0 12px;
 }
 .dm-root .btn:hover { border-color: var(--muted); }
@@ -115,7 +117,7 @@
   position: absolute; top: 12px; left: max(12px, env(safe-area-inset-left, 0px)); display: flex; gap: 2px; align-items: center;
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px; max-width: calc(100% - 24px); overflow-x: auto;
 }
-.dm-root .selbar button { height: 30px; padding: 0 10px; border: 0; background: transparent; border-radius: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.dm-root .app .selbar button { height: 30px; padding: 0 10px; border: 0; background: transparent; border-radius: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 .dm-root .selbar button:hover { background: var(--surface-2); color: var(--fg); }
 .dm-root .selbar .del { color: var(--danger); }
 .dm-root .selbar .selonly { display: contents; }
@@ -126,7 +128,7 @@
   .dm-root .app { grid-template-columns: minmax(0,1fr); }
   .dm-root .tbtn .lbl, .dm-root .tbtn kbd { display: none; }
   .dm-root .brand .bt { display: none; }
-  .dm-root .style-toggle { display: inline-flex; }
+  .dm-root .app .style-toggle { display: inline-flex; }
   .dm-root .panel {
     position: absolute; left: 0; right: 0; bottom: 0; max-height: 70%; z-index: 20; border-left: 0; border-top: 1px solid var(--line);
     border-radius: 14px 14px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.18);
