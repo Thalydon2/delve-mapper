@@ -19,11 +19,20 @@ function h(x, y, k) {
 const key = (x, y) => x + "," + y;
 
 // ---------- state ----------
-let cells = new Map();     // "x,y" -> texture id
+// Layers, bottom to top. Each has its own floor squares and its own wall/surroundings style.
+let layers = [];           // {id, name, visible, style: {bg, depth, wallW, shadow}, cells: Map "x,y" -> texture, cache}
+let activeId = 0, nextLayerId = 1;
+let cells = new Map();     // the selected layer's squares (editing tools write here)
 let walls = new Set();     // interior wall edges "h:x:y" / "v:x:y"
 let doors = new Set();
 const DEFAULT_STYLE = { bg: "hatch", depth: 1, wallW: 0.18, grid: true, shadow: true, ppc: opts.ppc || 70, ...(opts.defaultStyle || {}) };
-let style = { ...DEFAULT_STYLE };
+let style = { ...DEFAULT_STYLE };   // map-wide: grid, ppc
+const LAYER_KEYS = ["bg", "depth", "wallW", "shadow"];
+const layerStyle = (src = DEFAULT_STYLE) => { const o = {}; for (const k of LAYER_KEYS) o[k] = src[k] ?? DEFAULT_STYLE[k]; return o; };
+const mapStyle = () => style;
+function makeLayer(name, st) { return { id: nextLayerId++, name, visible: true, style: layerStyle(st), cells: new Map(), cache: null }; }
+const activeLayer = () => layers.find(L => L.id === activeId) || layers[layers.length - 1];
+function setActive(id) { activeId = id; const L = activeLayer(); cells = L ? L.cells : new Map(); }
 let props = [];            // {id, t, x, y (cell units, centre), r (radians), s (scale)}
 let nextId = 1;
 let curProp = "table";
@@ -34,10 +43,8 @@ let tool = "room";
 const undoStack = [], redoStack = [];
 
 // derived
-let floorList = [], nearList = [], wallEdges = [], doorEdges = [], shoreEdges = [], boundary = [], hatchClusters = [], roughClusters = [], rockPolys = [];
-const isIndoor = (x, y) => { const t = cells.get(key(x, y)); return t !== undefined && !TEX[t].outdoor; };
-
-const isFloor = (x, y) => cells.has(key(x, y));
+let floorList = [], doorEdges = [];   // all layers combined (bounds, doors)
+const isFloor = (x, y) => { const k = key(x, y); for (const L of layers) if (L.cells.has(k)) return true; return false; };
 function edgeCells(e) { // returns [ax,ay,bx,by]
   const [o, xs, ys] = e.split(":"); const x = +xs, y = +ys;
   return o === "h" ? [x, y - 1, x, y] : [x - 1, y, x, y];
@@ -48,16 +55,25 @@ function rebuild() {
   // prune orphans
   for (const e of [...walls]) { const [a,b,c,d] = edgeCells(e); if (!(isFloor(a,b) && isFloor(c,d))) walls.delete(e); }
   for (const e of [...doors]) if (!edgeTouchesFloor(e)) doors.delete(e);
+  floorList = [];
+  for (const L of layers) { buildLayer(L); for (const f of L.cache.floorList) floorList.push(f); }
+  doorEdges = [];
+  for (const e of doors) { const [o, x, y] = e.split(":"); doorEdges.push({ o, x: +x, y: +y }); }
+}
+
+function buildLayer(L) {
+  const cells = L.cells, style = L.style;
+  const isFloor = (x, y) => cells.has(key(x, y));
+  let floorList, nearList, wallEdges, shoreEdges, boundary, hatchClusters, roughClusters, rockPolys;
 
   floorList = [];
   for (const [k, t] of cells) { const i = k.indexOf(","); floorList.push({ x: +k.slice(0, i), y: +k.slice(i + 1), t }); }
 
-  const isIn = (x, y) => { const t = cells.get(key(x, y)); return t !== undefined && !TEX[t].outdoor; };
+  const isIn = isFloor; // every square in the layer casts the surroundings band
 
   // indoor boundary squares define the hatched band
   boundary = [];
   for (const f of floorList) {
-    if (TEX[f.t].outdoor) continue;
     let inner = true;
     for (let dy = -1; dy <= 1 && inner; dy++) for (let dx = -1; dx <= 1; dx++) if (!isIn(f.x + dx, f.y + dy)) { inner = false; break; }
     if (!inner) boundary.push(f);
@@ -158,18 +174,16 @@ function rebuild() {
     const out = !!TEX[f.t].outdoor;
     const side = (nx, ny, o, ex, ey) => {
       const nt = cells.get(key(nx, ny)), rough = f.t === "cave" || nt === "cave";
-      if (nt === undefined) (out ? shore : add)(o, ex, ey, rough);
-      else if (out !== !!TEX[nt].outdoor) add(o, ex, ey, rough);
-      else if (out && nt !== f.t) shore(o, ex, ey);
+      if (nt === undefined) add(o, ex, ey, rough);                                     // edge of the layer: a wall
+      else if (nt !== f.t && (out || TEX[nt].outdoor)) shore(o, ex, ey);              // outdoor ground meeting another floor in the same layer
     };
     side(f.x, f.y - 1, "h", f.x, f.y);
     side(f.x, f.y + 1, "h", f.x, f.y + 1);
     side(f.x - 1, f.y, "v", f.x, f.y);
     side(f.x + 1, f.y, "v", f.x + 1, f.y);
   }
-  for (const e of walls) { const [o, x, y] = e.split(":"), [a, b, c, d] = edgeCells(e); add(o, +x, +y, cells.get(key(a, b)) === "cave" || cells.get(key(c, d)) === "cave"); }
-  doorEdges = [];
-  for (const e of doors) { const [o, x, y] = e.split(":"); doorEdges.push({ o, x: +x, y: +y, wall: seen.has(e) }); }
+  for (const e of walls) { const [o, x, y] = e.split(":"), [a, b, c, d] = edgeCells(e); if (isFloor(a, b) && isFloor(c, d)) add(o, +x, +y, cells.get(key(a, b)) === "cave" || cells.get(key(c, d)) === "cave"); }
+  L.cache = { floorList, nearList, wallEdges, shoreEdges, boundary, hatchClusters, roughClusters, rockPolys, isFloor };
 }
 
 // ---------- textures ----------
@@ -442,8 +456,8 @@ function makeProp(t, u, v, free) {
 // ---------- scene ----------
 function inB(b, x, y, m = 0) { return x >= b.x0 - m && x <= b.x1 + m && y >= b.y0 - m && y <= b.y1 + m; }
 
-function bandClip(ctx, b, extra = 0) {
-  const D = style.depth + extra, s = CELL, r = D * s;
+function bandClip(ctx, b, extra, L) {
+  const { boundary } = L.cache, D = L.style.depth + extra, s = CELL, r = D * s;
   ctx.beginPath();
   for (const f of boundary) {
     if (!inB(b, f.x, f.y, D + 1)) continue;
@@ -457,7 +471,8 @@ function bandClip(ctx, b, extra = 0) {
   }
   ctx.clip();
 }
-function drawRocks(ctx, b) {
+function drawRocks(ctx, b, L) {
+  const { rockPolys } = L.cache;
   ctx.lineJoin = "round"; ctx.lineWidth = 0.9;
   for (const dark of [false, true]) {
     for (const r of rockPolys) {
@@ -470,11 +485,11 @@ function drawRocks(ctx, b) {
     }
   }
 }
-function drawSurroundings(ctx, b) {
-  const D = style.depth, s = CELL;
+function drawSurroundings(ctx, b, L) {
+  const style = L.style, { boundary, nearList, hatchClusters, roughClusters } = L.cache, D = style.depth, s = CELL;
   if (style.bg === "none" || !boundary.length) return;
-  if (style.bg === "rocks") { drawRocks(ctx, b); return; }
-  ctx.save(); bandClip(ctx, b, style.bg === "rough" ? 0.45 : 0);
+  if (style.bg === "rocks") { drawRocks(ctx, b, L); return; }
+  ctx.save(); bandClip(ctx, b, style.bg === "rough" ? 0.45 : 0, L);
   if (style.bg === "rough") {
     ctx.fillStyle = "rgba(31,27,24,.17)"; ctx.fillRect(b.x0 * s, b.y0 * s, (b.x1 - b.x0 + 1) * s, (b.y1 - b.y0 + 1) * s);
     ctx.strokeStyle = INK; ctx.lineCap = "round";
@@ -511,11 +526,29 @@ function drawSurroundings(ctx, b) {
 }
 
 function drawScene(ctx, b) {
-  const s = CELL;
-  drawSurroundings(ctx, b);
+  const vis = layers.filter(L => L.visible && L.cache);
+  for (const L of vis) drawSurroundings(ctx, b, L);   // all bands first, so a layer's band never covers another layer's floor
+  for (const L of vis) drawLayerBody(ctx, b, L);
+  const s = CELL, W = (activeLayer() ? activeLayer().style.wallW : 0.18) * s;
+  for (const p of props) if (PROPS[p.t] && PROPS[p.t].cat === "furn" && inB(b, p.x, p.y, 3)) drawProp(ctx, p);
+  // doors
+  for (const d of doorEdges) {
+    if (!inB(b, d.x, d.y, 1)) continue;
+    const len = 0.62 * s, th = Math.max(0.26 * s, W * 1.6);
+    const cx = d.o === "h" ? (d.x + 0.5) * s : d.x * s, cy = d.o === "h" ? d.y * s : (d.y + 0.5) * s;
+    const w = d.o === "h" ? len : th, hh = d.o === "h" ? th : len;
+    ctx.fillStyle = "#fcfbf8"; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.2, W * 0.45); ctx.lineJoin = "miter";
+    ctx.beginPath(); ctx.rect(cx - w / 2, cy - hh / 2, w, hh); ctx.fill(); ctx.stroke();
+  }
+  for (const p of props) if (PROPS[p.t] && PROPS[p.t].cat === "fol" && inB(b, p.x, p.y, 3)) drawProp(ctx, p);
+}
+
+function drawLayerBody(ctx, b, L) {
+  const s = CELL, style = L.style, { floorList, wallEdges, shoreEdges, isFloor } = L.cache;
+  const isIndoor = isFloor;
   for (const f of floorList) if (inB(b, f.x, f.y)) TEX[f.t].draw(ctx, f.x, f.y);
 
-  if (style.grid) {
+  if (mapStyle().grid) {
     ctx.strokeStyle = "rgba(55,45,35,.22)"; ctx.lineWidth = 0.6; ctx.lineCap = "butt"; ctx.beginPath();
     for (const f of floorList) {
       if (!inB(b, f.x, f.y)) continue;
@@ -526,7 +559,7 @@ function drawScene(ctx, b) {
   }
 
   // soft shadow along the inside of walls
-  if (style.shadow) {
+  if (style.shadow && style.wallW > 0) {
     const w = 0.22 * s; ctx.fillStyle = "rgba(31,27,24,.16)"; ctx.beginPath();
     for (const e of wallEdges) {
       if (!inB(b, e.x, e.y, 1)) continue;
@@ -551,10 +584,9 @@ function drawScene(ctx, b) {
     }
     ctx.stroke();
   }
-  for (const p of props) if (PROPS[p.t] && PROPS[p.t].cat === "furn" && inB(b, p.x, p.y, 3)) drawProp(ctx, p);
-
   // walls
   const W = style.wallW * s;
+  if (W <= 0) return;
   ctx.strokeStyle = INK; ctx.lineWidth = W; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath();
   const seg = (o, x, y, t0, t1) => {
     if (o === "h") { ctx.moveTo((x + t0) * s, y * s); ctx.lineTo((x + t1) * s, y * s); }
@@ -580,16 +612,6 @@ function drawScene(ctx, b) {
   }
   ctx.stroke();
 
-  // doors
-  for (const d of doorEdges) {
-    if (!inB(b, d.x, d.y, 1)) continue;
-    const len = 0.62 * s, th = Math.max(0.26 * s, W * 1.6);
-    const cx = d.o === "h" ? (d.x + 0.5) * s : d.x * s, cy = d.o === "h" ? d.y * s : (d.y + 0.5) * s;
-    const w = d.o === "h" ? len : th, hh = d.o === "h" ? th : len;
-    ctx.fillStyle = "#fcfbf8"; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.2, W * 0.45); ctx.lineJoin = "miter";
-    ctx.beginPath(); ctx.rect(cx - w / 2, cy - hh / 2, w, hh); ctx.fill(); ctx.stroke();
-  }
-  for (const p of props) if (PROPS[p.t] && PROPS[p.t].cat === "fol" && inB(b, p.x, p.y, 3)) drawProp(ctx, p);
 }
 
 // ---------- view / canvas ----------
@@ -651,7 +673,7 @@ function render() {
     ctx.fillStyle = preview.erase ? "#a8432f" : accent; ctx.fillRect(sx, sy - 24, tw, 20);
     ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.fillText(label, sx + 6, sy - 14);
   } else if (preview && preview.kind === "line") {
-    ctx.strokeStyle = preview.erase ? "#a8432f" : accent; ctx.lineWidth = Math.max(3 / z, style.wallW * CELL); ctx.lineCap = "round";
+    ctx.strokeStyle = preview.erase ? "#a8432f" : accent; ctx.lineWidth = Math.max(3 / z, (activeLayer() ? activeLayer().style.wallW : 0.18) * CELL); ctx.lineCap = "round";
     ctx.globalAlpha = .75; ctx.beginPath(); ctx.moveTo(preview.ax * CELL, preview.ay * CELL); ctx.lineTo(preview.bx * CELL, preview.by * CELL); ctx.stroke(); ctx.globalAlpha = 1;
   } else if (hover && hover.kind === "ghost") {
     drawProp(ctx, hover.p, 0.5);
@@ -683,6 +705,7 @@ function zoomAt(sx, sy, factor) {
   view.z = z; view.x = sx - wx * z; view.y = sy - wy * z;
   requestRender();
 }
+function bandMargin() { let m = 1; for (const L of layers) if (L.visible && L.style.bg !== "none") m = Math.max(m, Math.ceil(L.style.depth) + 1); return m; }
 function mapBounds() { // in cells, x1/y1 exclusive
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const f of floorList) { x0 = Math.min(x0, f.x); y0 = Math.min(y0, f.y); x1 = Math.max(x1, f.x + 1); y1 = Math.max(y1, f.y + 1); }
@@ -693,7 +716,7 @@ function fitView() {
   const mb = mapBounds();
   if (!mb) { view.z = 1; view.x = VW / 2; view.y = VH / 2; requestRender(); return; }
   let { x0, y0, x1, y1 } = mb;
-  const m = Math.ceil(style.depth) + 1; x0 -= m; y0 -= m; x1 += m; y1 += m;
+  const m = bandMargin(); x0 -= m; y0 -= m; x1 += m; y1 += m;
   const w = (x1 - x0) * CELL, hh = (y1 - y0) * CELL;
   view.z = Math.min(2.5, Math.max(0.15, Math.min(VW / w, VH / hh)));
   view.x = VW / 2 - (x0 * CELL + w / 2) * view.z; view.y = VH / 2 - (y0 * CELL + hh / 2) * view.z;
@@ -702,22 +725,48 @@ function fitView() {
 
 // ---------- history & persistence ----------
 function serialize() {
-  const c = []; for (const [k, t] of cells) { const [x, y] = k.split(","); c.push([+x, +y, TEX_ORDER.indexOf(t)]); }
-  return { app: "delve-mapper", v: 2, cells: c, walls: [...walls], doors: [...doors], props: props.map(p => [p.t, +p.x.toFixed(3), +p.y.toFixed(3), +p.r.toFixed(4), +p.s.toFixed(3), p.id]), style: { ...style } };
+  const ls = layers.map(L => {
+    const c = []; for (const [k, t] of L.cells) { const [x, y] = k.split(","); c.push([+x, +y, TEX_ORDER.indexOf(t)]); }
+    return { id: L.id, name: L.name, visible: L.visible, style: { ...L.style }, cells: c };
+  });
+  return { app: "delve-mapper", v: 3, active: activeId, layers: ls, walls: [...walls], doors: [...doors], props: props.map(p => [p.t, +p.x.toFixed(3), +p.y.toFixed(3), +p.r.toFixed(4), +p.s.toFixed(3), p.id]), style: { grid: style.grid, ppc: style.ppc } };
+}
+// Older maps kept one set of squares and one style: indoor floors become "Dungeon", grass and water become "Outdoors" underneath.
+function layersFromLegacy(cellMap, legacy) {
+  const out = [], inn = [];
+  for (const [k, t] of cellMap) (TEX[t] && TEX[t].outdoor ? out : inn).push([k, t]);
+  const res = [];
+  if (out.length) { const L = makeLayer("Outdoors", { ...legacy, bg: "none", wallW: 0.04, shadow: false }); for (const [k, t] of out) L.cells.set(k, t); res.push(L); }
+  if (inn.length || !out.length) { const L = makeLayer("Dungeon", legacy); for (const [k, t] of inn) L.cells.set(k, t); res.push(L); }
+  return res;
 }
 function load(data) {
-  if (!data || !Array.isArray(data.cells)) throw new Error("bad");
-  cells = new Map(); for (const [x, y, t] of data.cells) cells.set(key(x, y), TEX_ORDER[t] || "plain");
+  if (!data || !(Array.isArray(data.cells) || Array.isArray(data.layers))) throw new Error("bad");
   walls = new Set(data.walls || []); doors = new Set(data.doors || []);
   style = { ...DEFAULT_STYLE, ...(data.style || {}) };
   if (!data.v || data.v < 2) style.depth = Math.min(style.depth, 1); // v1 maps: tighter hatching by default
+  nextLayerId = 1;
+  if (Array.isArray(data.layers)) {
+    layers = data.layers.map(d => {
+      const L = makeLayer(d.name || "Layer", d.style || {}); L.visible = d.visible !== false;
+      if (d.id) { L.id = d.id; nextLayerId = Math.max(nextLayerId, d.id + 1); }
+      for (const [x, y, t] of d.cells || []) L.cells.set(key(x, y), TEX_ORDER[t] || "plain");
+      return L;
+    });
+    if (!layers.length) layers = [makeLayer("Dungeon")];
+  } else {
+    const m = new Map(); for (const [x, y, t] of data.cells) m.set(key(x, y), TEX_ORDER[t] || "plain");
+    layers = layersFromLegacy(m, style);
+  }
+  setActive(layers.some(L => L.id === data.active) ? data.active : layers[layers.length - 1].id);
   props = []; nextId = 1;
   for (const a of data.props || []) { if (!PROPS[a[0]]) continue; const id = a[5] || nextId; props.push({ t: a[0], x: a[1], y: a[2], r: a[3] || 0, s: a[4] || 1, id }); nextId = Math.max(nextId, id + 1); }
   if (selected) selected = props.find(p => p.id === selected.id) || null;
-  rebuild(); syncStyleUI(); syncSel(); requestRender();
+  rebuild(); syncStyleUI(); syncSel(); renderLayers(); requestRender();
 }
 function begin() { undoStack.push(JSON.stringify(serialize())); if (undoStack.length > 200) undoStack.shift(); redoStack.length = 0; updateUndoUI(); }
-function changed() { rebuild(); requestRender(); saveLocal(); }
+function changed() { rebuild(); requestRender(); saveLocal(); refreshCounts(); }
+function refreshCounts() { if (typeof layerList === "undefined") return; layerList.querySelectorAll(".layer").forEach(r => { const L = layers.find(l => l.id === +r.dataset.id); if (L) r.querySelector(".lcount").textContent = L.cells.size ? L.cells.size + " sq" : "empty"; }); }
 function undo() { if (!undoStack.length) return; redoStack.push(JSON.stringify(serialize())); load(JSON.parse(undoStack.pop())); saveLocal(); updateUndoUI(); }
 function redo() { if (!redoStack.length) return; undoStack.push(JSON.stringify(serialize())); load(JSON.parse(redoStack.pop())); saveLocal(); updateUndoUI(); }
 function updateUndoUI() { $("undo").disabled = !undoStack.length; $("redo").disabled = !redoStack.length; }
@@ -772,6 +821,7 @@ canvas.addEventListener("pointerdown", e => {
   if (pointers.size > 2) return;
   const erase = e.button === 2 || e.altKey;
   if (e.button === 1 || tool === "pan" || spaceDown) { action = { kind: "pan", sx, sy, vx: view.x, vy: view.y }; canvas.style.cursor = "grabbing"; return; }
+  if ((tool === "room" || tool === "erase" || tool === "brush") && activeLayer() && !activeLayer().visible) toast("\u201c" + activeLayer().name + "\u201d is hidden. Show it to see what you draw.");
   if (tool === "room" || tool === "erase") {
     const [x, y] = cellAt(sx, sy);
     action = { kind: "rect", erase: erase || tool === "erase" };
@@ -941,6 +991,56 @@ function drawSwatches() {
     }
   });
 }
+// layers panel
+const layerList = $("layerList");
+function renderLayers() {
+  layerList.innerHTML = "";
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const L = layers[i], row = document.createElement("div");
+    row.className = "layer" + (L.id === activeId ? " active" : "") + (L.visible ? "" : " hidden-layer");
+    row.dataset.id = L.id;
+    const eye = document.createElement("button");
+    eye.className = "eye"; eye.title = L.visible ? "Hide layer" : "Show layer"; eye.setAttribute("aria-label", eye.title);
+    eye.innerHTML = L.visible
+      ? '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".5"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.4"/></svg>';
+    eye.addEventListener("click", ev => { ev.stopPropagation(); begin(); L.visible = !L.visible; renderLayers(); changed(); });
+    const name = document.createElement("input");
+    name.type = "text"; name.value = L.name; name.className = "lname"; name.setAttribute("aria-label", "Layer name");
+    name.addEventListener("focus", () => { if (L.id !== activeId) selectLayer(L.id, true); });
+    name.addEventListener("change", () => { const v = name.value.trim(); if (v && v !== L.name) { begin(); L.name = v; saveLocal(); syncStyleUI(); } else name.value = L.name; });
+    name.addEventListener("keydown", ev => { if (ev.key === "Enter") { name.dispatchEvent(new Event("change")); appEl.focus({ preventScroll: true }); } ev.stopPropagation(); });
+    const count = document.createElement("span");
+    count.className = "lcount"; count.textContent = L.cells.size ? L.cells.size + " sq" : "empty";
+    row.append(eye, name, count);
+    row.addEventListener("click", () => selectLayer(L.id));
+    layerList.appendChild(row);
+  }
+  if (document.activeElement === document.body && root.isConnected) appEl.focus({ preventScroll: true }); // keep shortcuts working after the list redraws
+  const i = layers.findIndex(L => L.id === activeId);
+  $("layerUp").disabled = i >= layers.length - 1; $("layerDown").disabled = i <= 0; $("layerDel").disabled = layers.length <= 1;
+}
+function selectLayer(id, keepFocus) { setActive(id); syncStyleUI(); if (!keepFocus) renderLayers(); else layerList.querySelectorAll(".layer").forEach(r => r.classList.toggle("active", +r.dataset.id === id)); updateHud(); }
+$("layerAdd").addEventListener("click", () => {
+  begin();
+  const cur = activeLayer(), L = makeLayer("Layer " + (layers.length + 1), cur ? cur.style : DEFAULT_STYLE);
+  layers.splice(layers.indexOf(cur) + 1, 0, L); setActive(L.id); renderLayers(); syncStyleUI(); changed();
+  const inp = layerList.querySelector('.layer.active .lname'); if (inp) { inp.focus(); inp.select(); }
+});
+function moveLayer(dir) {
+  const i = layers.findIndex(L => L.id === activeId), j = i + dir;
+  if (i < 0 || j < 0 || j >= layers.length) return;
+  begin(); [layers[i], layers[j]] = [layers[j], layers[i]]; renderLayers(); changed();
+}
+$("layerUp").addEventListener("click", () => moveLayer(1));
+$("layerDown").addEventListener("click", () => moveLayer(-1));
+$("layerDel").addEventListener("click", () => {
+  if (layers.length <= 1) return;
+  const L = activeLayer(), i = layers.indexOf(L);
+  begin(); layers.splice(i, 1); setActive(layers[Math.max(0, i - 1)].id); renderLayers(); syncStyleUI(); changed();
+  toast("Deleted layer \u201c" + L.name + "\u201d. Undo brings it back.");
+});
+
 // prop palette
 function buildPropPalette() {
   const furn = $("propsFurn"), fol = $("propsFol");
@@ -989,19 +1089,21 @@ $("selAngle").addEventListener("change", e => { const v = parseFloat(e.target.va
 
 function setTex(t) { curTex = t; swWrap.querySelectorAll(".swatch").forEach(b => b.setAttribute("aria-pressed", b.dataset.tex === t)); }
 
-root.querySelectorAll("[data-bg]").forEach(b => b.addEventListener("click", () => { style.bg = b.dataset.bg; syncStyleUI(); changed(); }));
+root.querySelectorAll("[data-bg]").forEach(b => b.addEventListener("click", () => { begin(); activeLayer().style.bg = b.dataset.bg; syncStyleUI(); changed(); }));
 const depth = $("depth"), wallW = $("wallW"), gridChk = $("gridChk");
-depth.addEventListener("input", () => { style.depth = +depth.value; syncStyleUI(); changed(); });
-wallW.addEventListener("input", () => { style.wallW = +wallW.value; syncStyleUI(); changed(); });
+depth.addEventListener("input", () => { activeLayer().style.depth = +depth.value; syncStyleUI(); changed(); });
+wallW.addEventListener("input", () => { activeLayer().style.wallW = +wallW.value; syncStyleUI(); changed(); });
 gridChk.addEventListener("change", () => { style.grid = gridChk.checked; syncStyleUI(); changed(); drawSwatches(); });
-$("shadowChk").addEventListener("change", e => { style.shadow = e.target.checked; changed(); });
+$("shadowChk").addEventListener("change", e => { begin(); activeLayer().style.shadow = e.target.checked; changed(); });
 function syncStyleUI() {
-  root.querySelectorAll("[data-bg]").forEach(b => b.setAttribute("aria-pressed", b.dataset.bg === style.bg));
-  depth.value = style.depth; $("depthOut").textContent = style.depth + " sq";
-  depth.disabled = style.bg === "none";
-  wallW.value = style.wallW; $("wallOut").textContent = (+style.wallW).toFixed(2);
+  const ls = activeLayer() ? activeLayer().style : layerStyle();
+  root.querySelectorAll("[data-bg]").forEach(b => b.setAttribute("aria-pressed", b.dataset.bg === ls.bg));
+  depth.value = ls.depth; $("depthOut").textContent = ls.depth + " sq";
+  depth.disabled = ls.bg === "none";
+  wallW.value = ls.wallW; $("wallOut").textContent = +ls.wallW > 0 ? (+ls.wallW).toFixed(2) : "none";
+  $("layerStyleName").textContent = activeLayer() ? activeLayer().name : "";
   gridChk.checked = style.grid;
-  $("shadowChk").checked = !!style.shadow;
+  $("shadowChk").checked = !!ls.shadow;
   $("ppc").value = String(style.ppc);
 }
 
@@ -1015,7 +1117,7 @@ function renderPng() {
     if (!mb) { resolve(null); return; }
     const ppc = +style.ppc || 70;
     let { x0, y0, x1, y1 } = mb; x1 -= 1; y1 -= 1;
-    const m = style.bg === "none" ? 1 : Math.ceil(style.depth) + 1; x0 -= m; y0 -= m; x1 += m; y1 += m;
+    const m = bandMargin(); x0 -= m; y0 -= m; x1 += m; y1 += m;
     let scale = ppc / CELL, w = (x1 - x0 + 1) * ppc, hh = (y1 - y0 + 1) * ppc;
     const maxDim = 12000;
     if (Math.max(w, hh) > maxDim) { const k = maxDim / Math.max(w, hh); scale *= k; w = Math.floor(w * k); hh = Math.floor(hh * k); }
@@ -1039,16 +1141,23 @@ const newBtn = $("newMap"); let newArmed = 0;
 newBtn.addEventListener("click", () => {
   if (!newArmed) { newBtn.textContent = "Click again to clear the map"; newBtn.classList.add("danger-armed"); newArmed = setTimeout(() => { newArmed = 0; newBtn.textContent = "New blank map"; newBtn.classList.remove("danger-armed"); }, 3000); return; }
   clearTimeout(newArmed); newArmed = 0; newBtn.textContent = "New blank map"; newBtn.classList.remove("danger-armed");
-  begin(); cells.clear(); walls.clear(); doors.clear(); props = []; selected = null; syncSel(); changed(); fitView(); toast("Map cleared. Undo brings it back.");
+  begin(); nextLayerId = 1; layers = [makeLayer("Dungeon")]; setActive(layers[0].id); walls.clear(); doors.clear(); props = []; selected = null; syncSel(); syncStyleUI(); renderLayers(); changed(); fitView(); toast("Map cleared. Undo brings it back.");
 });
 
 $("sampleBtn").addEventListener("click", () => {
-  begin(); cells.clear(); walls.clear(); doors.clear(); props = []; selected = null; nextId = 1;
-  sampleMap(); syncStyleUI(); syncSel(); changed(); fitView(); toast("Sample loaded. Undo brings your map back.");
+  begin(); walls.clear(); doors.clear(); props = []; selected = null; nextId = 1; nextLayerId = 1;
+  const m = sampleMap(); layers = layersFromLegacy(m, DEFAULT_STYLE); setActive(layers[layers.length - 1].id);
+  syncStyleUI(); syncSel(); renderLayers(); changed(); fitView(); toast("Sample loaded. Undo brings your map back.");
 });
 
 // keyboard
-root.addEventListener("keydown", e => {
+// Shortcuts work while this map was the last thing clicked, even if focus fell back to the page body.
+let rootActive = false;
+const onPointerAnywhere = e => { rootActive = root.contains(e.target); };
+document.addEventListener("pointerdown", onPointerAnywhere, true);
+const keyTargetOk = e => rootActive && root.isConnected && (root.contains(e.target) || e.target === document.body);
+const onKeyDown = e => {
+  if (!keyTargetOk(e)) return;
   if (e.target.closest && e.target.closest("input, select, textarea")) return;
   const k = e.key.toLowerCase();
   if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
@@ -1067,11 +1176,14 @@ root.addEventListener("keydown", e => {
   else if (k === "f") fitView();
   else if (k === "g") { style.grid = !style.grid; syncStyleUI(); changed(); drawSwatches(); }
   else if (k === "escape") { if (action) { action = null; preview = null; } selected = null; syncSel(); }
-});
-root.addEventListener("keyup", e => { if (e.code === "Space") { spaceDown = false; canvas.style.cursor = cursorFor(); } });
+};
+window.addEventListener("keydown", onKeyDown);
+const onKeyUp = e => { if (e.code === "Space") { spaceDown = false; canvas.style.cursor = cursorFor(); } };
+window.addEventListener("keyup", onKeyUp);
 
 // ---------- sample map ----------
 function sampleMap() {
+  const cells = new Map();
   const put = (x0, y0, x1, y1, t) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) cells.set(key(x, y), t); };
   put(2, 2, 8, 7, "flag");          // entry hall
   put(9, 4, 13, 4, "plain");        // corridor
@@ -1094,25 +1206,28 @@ function sampleMap() {
   P("bush", 17.3, 12.2, 0.2); P("bush", 22.8, 12.1, 2); P("bush", 13.8, 13.6, 4);
   P("grass", 16.4, 15.4); P("grass", 20.6, 16.3); P("grass", 24.4, 12.2); P("flowers", 18, 10.6); P("flowers", 22.3, 16.2);
   P("log", 16.6, 14.2, 0.3); P("rock", 22.6, 12.9, 1, 0.8);
+  return cells;
 }
 
 // ---------- boot / api ----------
 let alive = true;
 buildPropPalette(); setProp(curProp);
-rebuild(); syncStyleUI(); setTex(curTex); setTool("room"); drawSwatches(); updateUndoUI();
+layers = [makeLayer("Dungeon")]; setActive(layers[0].id);
+rebuild(); syncStyleUI(); renderLayers(); setTex(curTex); setTool("room"); drawSwatches(); updateUndoUI();
 resize();
 return {
   setData(data) {
-    cells = new Map(); walls = new Set(); doors = new Set(); props = []; selected = null;
-    if (data && Array.isArray(data.cells)) { try { load(data); } catch (e) { toast("This map file could not be read."); } }
-    else { style = { ...DEFAULT_STYLE }; rebuild(); syncStyleUI(); }
+    walls = new Set(); doors = new Set(); props = []; selected = null;
+    nextLayerId = 1; layers = [makeLayer("Dungeon")]; setActive(layers[0].id);
+    if (data && (Array.isArray(data.cells) || Array.isArray(data.layers))) { try { load(data); } catch (e) { toast("This map file could not be read."); } }
+    else { style = { ...DEFAULT_STYLE }; rebuild(); syncStyleUI(); renderLayers(); }
     undoStack.length = 0; redoStack.length = 0; updateUndoUI(); drawSwatches(); syncSel();
     requestAnimationFrame(() => { resize(); fitView(); });
   },
   getData: serialize,
   renderPng,
   toast,
-  destroy() { alive = false; clearTimeout(saveT); ro.disconnect(); }
+  destroy() { alive = false; clearTimeout(saveT); ro.disconnect(); window.removeEventListener("keydown", onKeyDown); window.removeEventListener("keyup", onKeyUp); document.removeEventListener("pointerdown", onPointerAnywhere, true); }
 };
 
 }
