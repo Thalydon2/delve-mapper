@@ -22,7 +22,7 @@ const key = (x, y) => x + "," + y;
 let cells = new Map();     // "x,y" -> texture id
 let walls = new Set();     // interior wall edges "h:x:y" / "v:x:y"
 let doors = new Set();
-const DEFAULT_STYLE = { bg: "hatch", depth: 1, wallW: 0.18, grid: true, ppc: opts.ppc || 70, ...(opts.defaultStyle || {}) };
+const DEFAULT_STYLE = { bg: "hatch", depth: 1, wallW: 0.18, grid: true, shadow: true, ppc: opts.ppc || 70, ...(opts.defaultStyle || {}) };
 let style = { ...DEFAULT_STYLE };
 let props = [];            // {id, t, x, y (cell units, centre), r (radians), s (scale)}
 let nextId = 1;
@@ -34,7 +34,8 @@ let tool = "room";
 const undoStack = [], redoStack = [];
 
 // derived
-let floorList = [], nearList = [], wallEdges = [], doorEdges = [], shoreEdges = [], boundary = [], hatchClusters = [], roughClusters = [];
+let floorList = [], nearList = [], wallEdges = [], doorEdges = [], shoreEdges = [], boundary = [], hatchClusters = [], roughClusters = [], rockPolys = [];
+const isIndoor = (x, y) => { const t = cells.get(key(x, y)); return t !== undefined && !TEX[t].outdoor; };
 
 const isFloor = (x, y) => cells.has(key(x, y));
 function edgeCells(e) { // returns [ax,ay,bx,by]
@@ -111,6 +112,40 @@ function rebuild() {
         segs.push((mx - dx * hl) * CELL, (my - dy * hl) * CELL, (mx + dx * hl) * CELL, (my + dy * hl) * CELL);
       }
       roughClusters.push({ x: n.x, y: n.y, heavy: r(7) < 0.4, segs });
+    }
+  }
+
+  // "rocks" surroundings: packed irregular stones (Voronoi cells on a jittered half-square lattice)
+  rockPolys = [];
+  if (style.bg === "rocks") {
+    const L = 0.5, inner = Math.max(0.5, D * 0.5), sites = new Map();
+    const site = (i, j) => [(i + 0.5 + (h(i, j, 1201) - 0.5) * 0.8) * L, (j + 0.5 + (h(i, j, 1202) - 0.5) * 0.8) * L];
+    const want = [];
+    const consider = (cx, cy) => { for (let j = 2 * cy; j <= 2 * cy + 1; j++) for (let i = 2 * cx; i <= 2 * cx + 1; i++) { const k = i + "," + j; if (!sites.has(k)) { sites.set(k, 1); want.push([i, j]); } } };
+    for (const n of nearList) consider(n.x, n.y);
+    for (const f of boundary) consider(f.x, f.y);
+    for (const [i, j] of want) {
+      const [sx, sy] = site(i, j), cx = Math.floor(sx), cy = Math.floor(sy);
+      let md = Infinity;
+      for (let dy = -Dc; dy <= Dc; dy++) for (let dx = -Dc; dx <= Dc; dx++) if (isIn(cx + dx, cy + dy)) md = Math.min(md, rectDist(sx, sy, cx + dx, cy + dy));
+      if (md > D + 0.05) continue;
+      // cell polygon: start from a square, clip by the bisector with each nearby site
+      let poly = [[sx - 1.5 * L, sy - 1.5 * L], [sx + 1.5 * L, sy - 1.5 * L], [sx + 1.5 * L, sy + 1.5 * L], [sx - 1.5 * L, sy + 1.5 * L]];
+      for (let nj = j - 2; nj <= j + 2 && poly.length; nj++) for (let ni = i - 2; ni <= i + 2; ni++) {
+        if (ni === i && nj === j) continue;
+        const [qx, qy] = site(ni, nj), ux = qx - sx, uy = qy - sy, mx = (sx + qx) / 2, my = (sy + qy) / 2;
+        const side = p => (p[0] - mx) * ux + (p[1] - my) * uy;
+        const out = [];
+        for (let k = 0; k < poly.length; k++) {
+          const a = poly[k], b = poly[(k + 1) % poly.length], da = side(a), db = side(b);
+          if (da <= 0) out.push(a);
+          if ((da < 0) !== (db < 0) && da !== db) { const t = da / (da - db); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); }
+        }
+        poly = out;
+      }
+      if (poly.length < 3) continue;
+      const pts = []; for (const p of poly) pts.push(p[0] * CELL, p[1] * CELL);
+      rockPolys.push({ x: cx, y: cy, dark: md <= inner, tone: h(i, j, 1203), pts });
     }
   }
 
@@ -422,9 +457,23 @@ function bandClip(ctx, b, extra = 0) {
   }
   ctx.clip();
 }
+function drawRocks(ctx, b) {
+  ctx.lineJoin = "round"; ctx.lineWidth = 0.9;
+  for (const dark of [false, true]) {
+    for (const r of rockPolys) {
+      if (r.dark !== dark || !inB(b, r.x, r.y, 1)) continue;
+      const g = r.pts;
+      ctx.beginPath(); ctx.moveTo(g[0], g[1]); for (let i = 2; i < g.length; i += 2) ctx.lineTo(g[i], g[i + 1]); ctx.closePath();
+      ctx.fillStyle = dark ? `hsl(30 6% ${30 + r.tone * 6}%)` : `hsl(32 6% ${55 + r.tone * 7}%)`;
+      ctx.fill();
+      ctx.strokeStyle = dark ? "#2c2925" : "#a9a398"; ctx.stroke();
+    }
+  }
+}
 function drawSurroundings(ctx, b) {
   const D = style.depth, s = CELL;
   if (style.bg === "none" || !boundary.length) return;
+  if (style.bg === "rocks") { drawRocks(ctx, b); return; }
   ctx.save(); bandClip(ctx, b, style.bg === "rough" ? 0.45 : 0);
   if (style.bg === "rough") {
     ctx.fillStyle = "rgba(31,27,24,.17)"; ctx.fillRect(b.x0 * s, b.y0 * s, (b.x1 - b.x0 + 1) * s, (b.y1 - b.y0 + 1) * s);
@@ -474,6 +523,22 @@ function drawScene(ctx, b) {
       if (isFloor(f.x, f.y + 1)) { ctx.moveTo(f.x * s, (f.y + 1) * s); ctx.lineTo((f.x + 1) * s, (f.y + 1) * s); }
     }
     ctx.stroke();
+  }
+
+  // soft shadow along the inside of walls
+  if (style.shadow) {
+    const w = 0.22 * s; ctx.fillStyle = "rgba(31,27,24,.16)"; ctx.beginPath();
+    for (const e of wallEdges) {
+      if (!inB(b, e.x, e.y, 1)) continue;
+      if (e.o === "h") {
+        if (isIndoor(e.x, e.y)) ctx.rect(e.x * s, e.y * s, s, w);
+        if (isIndoor(e.x, e.y - 1)) ctx.rect(e.x * s, e.y * s - w, s, w);
+      } else {
+        if (isIndoor(e.x, e.y)) ctx.rect(e.x * s, e.y * s, w, s);
+        if (isIndoor(e.x - 1, e.y)) ctx.rect(e.x * s - w, e.y * s, w, s);
+      }
+    }
+    ctx.fill("nonzero");
   }
 
   // outdoor edges
@@ -929,12 +994,14 @@ const depth = $("depth"), wallW = $("wallW"), gridChk = $("gridChk");
 depth.addEventListener("input", () => { style.depth = +depth.value; syncStyleUI(); changed(); });
 wallW.addEventListener("input", () => { style.wallW = +wallW.value; syncStyleUI(); changed(); });
 gridChk.addEventListener("change", () => { style.grid = gridChk.checked; syncStyleUI(); changed(); drawSwatches(); });
+$("shadowChk").addEventListener("change", e => { style.shadow = e.target.checked; changed(); });
 function syncStyleUI() {
   root.querySelectorAll("[data-bg]").forEach(b => b.setAttribute("aria-pressed", b.dataset.bg === style.bg));
   depth.value = style.depth; $("depthOut").textContent = style.depth + " sq";
   depth.disabled = style.bg === "none";
   wallW.value = style.wallW; $("wallOut").textContent = (+style.wallW).toFixed(2);
   gridChk.checked = style.grid;
+  $("shadowChk").checked = !!style.shadow;
   $("ppc").value = String(style.ppc);
 }
 
