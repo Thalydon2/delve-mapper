@@ -1,0 +1,16 @@
+{
+  "name": "delve-mapper",
+  "version": "0.1.0",
+  "description": "Grid dungeon map editor plugin for Obsidian",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --format=cjs --platform=browser --target=es2020 --external:obsidian --loader:.html=text --outfile=dist/main.js && cp manifest.json styles.css dist/",
+    "deploy": "npm run build && mkdir -p \"$HOME/The Luggage/.obsidian/plugins/delve-mapper\" && cp dist/* \"$HOME/The Luggage/.obsidian/plugins/delve-mapper/\""
+  },
+  "author": "Austin",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "esbuild": "^0.23.1"
+  },
+  "private": true
+}

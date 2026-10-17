@@ -1,0 +1,96 @@
+<div class="app" tabindex="-1">
+  <header class="bar">
+    <div class="tools" role="toolbar" aria-label="Tools">
+      <button class="tbtn" data-tool="room" title="Room: drag a rectangle (R). Right-drag erases."><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2.5" y="2.5" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 11l4 4" stroke="currentColor" stroke-width="1.5"/></svg><span class="lbl">Room</span><kbd>R</kbd></button>
+      <button class="tbtn" data-tool="brush" title="Brush: paint squares one at a time (B). Right-drag erases."><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 15l2-5 7-7 3 3-7 7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="lbl">Brush</span><kbd>B</kbd></button>
+      <button class="tbtn" data-tool="erase" title="Erase: drag a rectangle to remove floor (E)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M7 15h8M3.5 11.5l7-7 4 4-6 6h-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="lbl">Erase</span><kbd>E</kbd></button>
+      <button class="tbtn" data-tool="wall" title="Wall: drag along grid lines to split rooms (W). Click a wall to remove it."><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3v12M3 9h12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span class="lbl">Wall</span><kbd>W</kbd></button>
+      <button class="tbtn" data-tool="door" title="Door: click a wall to add or remove a door (D)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 9h3M14 9h3" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="5" y="6.5" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="lbl">Door</span><kbd>D</kbd></button>
+      <button class="tbtn" data-tool="prop" title="Props: place furniture and foliage (P)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="11.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="2" y="10" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span class="lbl">Props</span><kbd>P</kbd></button>
+      <button class="tbtn" data-tool="pan" title="Pan: drag to move the view (H, or hold Space)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 1.5v15M1.5 9h15M9 1.5l-2.5 2.5M9 1.5l2.5 2.5M9 16.5l-2.5-2.5M9 16.5l2.5-2.5M1.5 9L4 6.5M1.5 9L4 11.5M16.5 9L14 6.5M16.5 9L14 11.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span class="lbl">Pan</span><kbd>H</kbd></button>
+      <span class="sep"></span>
+      <button class="tbtn" data-dm="undo" title="Undo (Ctrl+Z)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M6 4L2.5 7.5 6 11M3 7.5h7.5a4.5 4.5 0 010 9H8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Undo</span></button>
+      <button class="tbtn" data-dm="redo" title="Redo (Ctrl+Shift+Z)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M12 4l3.5 3.5L12 11M15 7.5H7.5a4.5 4.5 0 000 9H10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="lbl">Redo</span></button>
+    </div>
+    <span class="spacer"></span>
+    <button class="tbtn style-toggle" data-dm="styleToggle" aria-expanded="false" title="Map style and files"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+  </header>
+
+  <main class="stage" data-dm="stage">
+    <canvas data-dm="map" aria-label="Dungeon map canvas"></canvas>
+    <div class="hud" data-dm="hud">Loading…</div>
+    <div class="zoom">
+      <button data-dm="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+      <span data-dm="zoomLbl">100%</span>
+      <button data-dm="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+      <button data-dm="zoomFit" title="Fit map to screen (F)" aria-label="Fit map to screen"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </div>
+    <div class="selbar" data-dm="selbar" hidden>
+      <span class="nm2" data-dm="selName">Prop</span>
+      <button data-act="rotl" title="Rotate left 15° ([) · Shift for 90°" aria-label="Rotate left 15 degrees">⟲ 15°</button>
+      <label class="ang"><input type="number" data-dm="selAngle" step="15" value="0" aria-label="Rotation in degrees">°</label>
+      <button data-act="rotr" title="Rotate right 15° (]) · Shift for 90°" aria-label="Rotate right 15 degrees">⟳ 15°</button>
+      <span class="selonly"><button data-act="smaller" title="Smaller (−)">Smaller</button><button data-act="larger" title="Larger (+)">Larger</button><button data-act="match" title="Use this prop's rotation for new props">Use for new</button><button data-act="del" class="del" title="Delete (Del)">Delete</button></span>
+    </div>
+    <div class="toast" data-dm="toast" style="opacity:0"></div>
+  </main>
+
+  <aside class="panel" data-dm="panel" aria-label="Map style">
+    <section class="sec">
+      <h2>Floor texture</h2>
+      <div class="swatches" data-dm="swatches"></div>
+      <p class="note">New rooms use this texture. Drag a room over existing floor to repaint it. Grass and water are outdoor ground, so they get a thin edge instead of walls and hatching.</p>
+    </section>
+    <section class="sec">
+      <h2>Props</h2>
+      <p class="sub">Furniture</p>
+      <div class="props" data-dm="propsFurn"></div>
+      <p class="sub">Foliage</p>
+      <div class="props" data-dm="propsFol"></div>
+      <p class="note">Click to place, drag a placed prop to move it. Dragging with foliage scatters it. New props all use the angle in the bar above the map. Furniture snaps to the grid at right angles; hold Alt to place it freely.</p>
+    </section>
+    <section class="sec">
+      <h2>Surroundings</h2>
+      <div class="seg" data-dm="bgSeg">
+        <button data-bg="hatch">Hatching</button>
+        <button data-bg="stipple">Stipple</button>
+        <button data-bg="none">Blank</button>
+      </div>
+      <label class="row"><span>Depth</span><output data-dm="depthOut">1 sq</output></label>
+      <input type="range" data-dm="depth" min="0.5" max="3" step="0.5" value="1">
+    </section>
+    <section class="sec">
+      <h2>Lines</h2>
+      <label class="row"><span>Wall weight</span><output data-dm="wallOut">0.18</output></label>
+      <input type="range" data-dm="wallW" min="0.08" max="0.32" step="0.02" value="0.18">
+      <label class="row"><span>Grid on floors</span><input type="checkbox" data-dm="gridChk" checked></label>
+    </section>
+    <section class="sec">
+      <h2>Export</h2>
+      <label class="row"><span>Pixels per square</span>
+        <select data-dm="ppc"><option value="50">50</option><option value="70" selected>70</option><option value="100">100</option><option value="140">140</option></select>
+      </label>
+      <button class="btn primary" data-dm="exportPng">Update PNG now</button>
+      <div class="btns">
+        <button class="btn" data-dm="newMap">New blank map</button>
+        <button class="btn" data-dm="sampleBtn">Load sample</button>
+      </div>
+      <p class="note">The map saves automatically. A PNG with the same name is kept next to it, ready to embed in notes or use as an Atlas scene.</p>
+    </section>
+    <section class="sec keys-sec">
+      <h2>Shortcuts</h2>
+      <dl class="keys">
+        <dt>R B E W D P H</dt><dd>Room, brush, erase, wall, door, props, pan</dd>
+        <dt>1 – 6</dt><dd>Pick floor texture</dd>
+        <dt>[ ]</dt><dd>Rotate 15° (Shift: 90°)</dd>
+        <dt>− +</dt><dd>Resize prop</dd>
+        <dt>Del</dt><dd>Delete selected prop</dd>
+        <dt>Right-drag</dt><dd>Erase with room or brush</dd>
+        <dt>Space + drag</dt><dd>Pan from any tool</dd>
+        <dt>Wheel</dt><dd>Zoom at cursor</dd>
+        <dt>Ctrl Z / Y</dt><dd>Undo / redo</dd>
+        <dt>F · G</dt><dd>Fit view · toggle grid</dd>
+      </dl>
+    </section>
+  </aside>
+</div>
