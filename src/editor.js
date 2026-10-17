@@ -34,7 +34,7 @@ let tool = "room";
 const undoStack = [], redoStack = [];
 
 // derived
-let floorList = [], nearList = [], wallEdges = [], doorEdges = [], shoreEdges = [], boundary = [], hatchClusters = [];
+let floorList = [], nearList = [], wallEdges = [], doorEdges = [], shoreEdges = [], boundary = [], hatchClusters = [], roughClusters = [];
 
 const isFloor = (x, y) => cells.has(key(x, y));
 function edgeCells(e) { // returns [ax,ay,bx,by]
@@ -95,17 +95,36 @@ function rebuild() {
     }
   }
 
+  // "rough" surroundings: darker, uneven strokes scattered unevenly through a slightly wider band
+  roughClusters = [];
+  for (const n of nearList) {
+    for (let i = 0; i < 4; i++) {
+      const r = k => h(n.x * 3 + i, n.y * 7 - i, 800 + k);
+      const keep = n.d <= 0.8 ? 0.97 : Math.max(0.12, 1.05 - n.d / (D + 0.6));
+      if (r(0) > keep) continue;
+      const px = n.x + r(1), py = n.y + r(2), a = r(3) * Math.PI;
+      const lines = 2 + ((r(4) * 5) | 0), len = 0.35 + 0.6 * r(5), gap = 0.1 + 0.07 * r(6);
+      const dx = Math.cos(a), dy = Math.sin(a), qx = -dy, qy = dx, segs = [];
+      for (let l = 0; l < lines; l++) {
+        const o = (l - (lines - 1) / 2) * gap, hl = len * (0.55 + 0.45 * h(n.x * 9 + i, n.y + l, 830)) / 2, sh = (h(n.x, n.y * 5 + l, 840 + i) - 0.5) * 0.2;
+        const mx = px + qx * o + dx * sh, my = py + qy * o + dy * sh;
+        segs.push((mx - dx * hl) * CELL, (my - dy * hl) * CELL, (mx + dx * hl) * CELL, (my + dy * hl) * CELL);
+      }
+      roughClusters.push({ x: n.x, y: n.y, heavy: r(7) < 0.4, segs });
+    }
+  }
+
   // walls: indoor floor against empty or outdoor ground; thin edges for outdoor ground
   wallEdges = []; shoreEdges = [];
   const seen = new Set(), seenShore = new Set();
-  const add = (o, x, y) => { const e = o + ":" + x + ":" + y; if (seen.has(e)) return; seen.add(e); wallEdges.push({ o, x, y, door: doors.has(e) }); };
+  const add = (o, x, y, rough) => { const e = o + ":" + x + ":" + y; if (seen.has(e)) return; seen.add(e); wallEdges.push({ o, x, y, door: doors.has(e), rough: !!rough }); };
   const shore = (o, x, y) => { const e = o + ":" + x + ":" + y; if (seenShore.has(e)) return; seenShore.add(e); shoreEdges.push({ o, x, y }); };
   for (const f of floorList) {
     const out = !!TEX[f.t].outdoor;
     const side = (nx, ny, o, ex, ey) => {
-      const nt = cells.get(key(nx, ny));
-      if (nt === undefined) (out ? shore : add)(o, ex, ey);
-      else if (out !== !!TEX[nt].outdoor) add(o, ex, ey);
+      const nt = cells.get(key(nx, ny)), rough = f.t === "cave" || nt === "cave";
+      if (nt === undefined) (out ? shore : add)(o, ex, ey, rough);
+      else if (out !== !!TEX[nt].outdoor) add(o, ex, ey, rough);
       else if (out && nt !== f.t) shore(o, ex, ey);
     };
     side(f.x, f.y - 1, "h", f.x, f.y);
@@ -113,7 +132,7 @@ function rebuild() {
     side(f.x - 1, f.y, "v", f.x, f.y);
     side(f.x + 1, f.y, "v", f.x + 1, f.y);
   }
-  for (const e of walls) { const [o, x, y] = e.split(":"); add(o, +x, +y); }
+  for (const e of walls) { const [o, x, y] = e.split(":"), [a, b, c, d] = edgeCells(e); add(o, +x, +y, cells.get(key(a, b)) === "cave" || cells.get(key(c, d)) === "cave"); }
   doorEdges = [];
   for (const e of doors) { const [o, x, y] = e.split(":"); doorEdges.push({ o, x: +x, y: +y, wall: seen.has(e) }); }
 }
@@ -233,7 +252,48 @@ TEX.water = {
     }
   }
 };
-const TEX_ORDER = ["plain", "flag", "wood", "dirt", "grass", "water"];
+TEX.cave = {
+  name: "Cave",
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL;
+    ctx.fillStyle = "#b8b1a4"; ctx.fillRect(X, Y, CELL, CELL);
+    for (let i = 0; i < 3; i++) { // mottled rock
+      const px = X + h(x, y, 900 + i) * CELL, py = Y + h(x, y, 910 + i) * CELL, r = 7 + h(x, y, 920 + i) * 9;
+      ctx.fillStyle = h(x, y, 930 + i) < 0.5 ? "rgba(80,72,62,.07)" : "rgba(255,250,240,.08)";
+      ctx.beginPath(); ctx.arc(px, py, r, 0, 6.283); ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(60,52,44,.55)"; ctx.lineWidth = 0.7; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (h(x, y, 940) < 0.55) { // crack
+      let px = X + (0.15 + 0.7 * h(x, y, 941)) * CELL, py = Y + (0.15 + 0.7 * h(x, y, 942)) * CELL, a = h(x, y, 943) * 6.283;
+      ctx.beginPath(); ctx.moveTo(px, py);
+      for (let k = 0; k < 3; k++) { a += (h(x, y, 944 + k) - 0.5) * 1.6; px += Math.cos(a) * 4; py += Math.sin(a) * 4; ctx.lineTo(px, py); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(60,52,44,.5)"; ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const px = X + h(x, y, 950 + i) * CELL, py = Y + h(x, y, 960 + i) * CELL, r = 0.4 + h(x, y, 970 + i) * 0.6; ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, 6.283); }
+    ctx.fill();
+    if (h(x, y, 980) < 0.3) { const px = X + (0.2 + 0.6 * h(x, y, 981)) * CELL, py = Y + (0.2 + 0.6 * h(x, y, 982)) * CELL; ctx.beginPath(); ctx.ellipse(px, py, 2.2, 1.5, h(x, y, 983) * 3, 0, 6.283); ctx.fillStyle = "#a59d8f"; ctx.fill(); ctx.strokeStyle = "rgba(40,34,28,.7)"; ctx.lineWidth = 0.6; ctx.stroke(); }
+  }
+};
+TEX.brick = {
+  name: "Brick",
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL, n = 4, bh = CELL / n, bw = CELL / 2;
+    ctx.save(); ctx.beginPath(); ctx.rect(X, Y, CELL, CELL); ctx.clip();
+    ctx.fillStyle = "#d8cdbf"; ctx.fillRect(X, Y, CELL, CELL);
+    for (let i = 0; i < n; i++) {
+      const r = y * n + i, off = (r & 1) ? bw / 2 : 0;
+      for (let j = 0; j < 3; j++) {
+        const k = 2 * x + j, bx = X - off + j * bw, by = Y + i * bh;
+        ctx.fillStyle = `hsl(${10 + h(k, r, 33) * 10} ${32 + h(k, r, 34) * 14}% ${42 + h(k, r, 35) * 14}%)`;
+        ctx.fillRect(bx + 0.6, by + 0.6, bw - 1.2, bh - 1.2);
+        if (h(k, r, 36) < 0.25) { ctx.fillStyle = "rgba(40,20,12,.18)"; ctx.fillRect(bx + 0.6, by + bh - 2.2, bw - 1.2, 1.6); }
+      }
+    }
+    ctx.restore();
+  }
+};
+const TEX_ORDER = ["plain", "flag", "wood", "dirt", "grass", "water", "cave", "brick"]; // order is saved in map files; append only
 
 // ---------- props ----------
 const PROP_INK = INK;
@@ -347,8 +407,8 @@ function makeProp(t, u, v, free) {
 // ---------- scene ----------
 function inB(b, x, y, m = 0) { return x >= b.x0 - m && x <= b.x1 + m && y >= b.y0 - m && y <= b.y1 + m; }
 
-function bandClip(ctx, b) {
-  const D = style.depth, s = CELL, r = D * s;
+function bandClip(ctx, b, extra = 0) {
+  const D = style.depth + extra, s = CELL, r = D * s;
   ctx.beginPath();
   for (const f of boundary) {
     if (!inB(b, f.x, f.y, D + 1)) continue;
@@ -365,8 +425,20 @@ function bandClip(ctx, b) {
 function drawSurroundings(ctx, b) {
   const D = style.depth, s = CELL;
   if (style.bg === "none" || !boundary.length) return;
-  ctx.save(); bandClip(ctx, b);
-  if (style.bg === "hatch") {
+  ctx.save(); bandClip(ctx, b, style.bg === "rough" ? 0.45 : 0);
+  if (style.bg === "rough") {
+    ctx.fillStyle = "rgba(31,27,24,.17)"; ctx.fillRect(b.x0 * s, b.y0 * s, (b.x1 - b.x0 + 1) * s, (b.y1 - b.y0 + 1) * s);
+    ctx.strokeStyle = INK; ctx.lineCap = "round";
+    for (const heavy of [false, true]) {
+      ctx.lineWidth = heavy ? 2.3 : 1.5; ctx.beginPath();
+      for (const c of roughClusters) {
+        if (c.heavy !== heavy || !inB(b, c.x, c.y, 1)) continue;
+        const g = c.segs;
+        for (let i = 0; i < g.length; i += 4) { ctx.moveTo(g[i], g[i + 1]); ctx.lineTo(g[i + 2], g[i + 3]); }
+      }
+      ctx.stroke();
+    }
+  } else if (style.bg === "hatch") {
     ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.lineCap = "round"; ctx.beginPath();
     for (const c of hatchClusters) {
       if (!inB(b, c.x, c.y, 1)) continue;
@@ -424,9 +496,22 @@ function drawScene(ctx, b) {
     else { ctx.moveTo(x * s, (y + t0) * s); ctx.lineTo(x * s, (y + t1) * s); }
   };
   for (const e of wallEdges) {
-    if (!inB(b, e.x, e.y, 1)) continue;
+    if (!inB(b, e.x, e.y, 1) || (e.rough && !e.door)) continue;
     if (e.door) { seg(e.o, e.x, e.y, 0, 0.18); seg(e.o, e.x, e.y, 0.82, 1); }
     else seg(e.o, e.x, e.y, 0, 1);
+  }
+  ctx.stroke();
+  // cave walls: jagged line; square corners stay fixed so neighbouring edges still meet
+  ctx.lineWidth = W * 1.2; ctx.beginPath();
+  for (const e of wallEdges) {
+    if (!e.rough || e.door || !inB(b, e.x, e.y, 1)) continue;
+    const hx = e.o === "h" ? 1 : 0, hy = 1 - hx, kx = e.x * 2 + hy;
+    ctx.moveTo(e.x * s, e.y * s);
+    for (let i = 1; i <= 5; i++) {
+      const t = i / 6, off = (h(kx, e.y, 990 + i) - 0.5) * 0.3 * Math.sin(t * Math.PI) * 1.6 * s;
+      ctx.lineTo((e.x + hx * t) * s + hy * off, (e.y + hy * t) * s + hx * off);
+    }
+    ctx.lineTo((e.x + hx) * s, (e.y + hy) * s);
   }
   ctx.stroke();
 
@@ -906,7 +991,7 @@ root.addEventListener("keydown", e => {
   const map = { r: "room", b: "brush", e: "erase", w: "wall", d: "door", p: "prop", h: "pan" };
   e.stopPropagation();
   if (map[k]) setTool(map[k]);
-  else if (k >= "1" && k <= "6") setTex(TEX_ORDER[+k - 1]);
+  else if (k >= "1" && k <= "8") setTex(TEX_ORDER[+k - 1]);
   else if (k === "]" || k === "}") rotateSel(1, e.shiftKey ? 90 : 15);
   else if (k === "[" || k === "{") rotateSel(-1, e.shiftKey ? 90 : 15);
   else if ((k === "delete" || k === "backspace") && selected) { e.preventDefault(); deleteSel(); }

@@ -86,7 +86,7 @@
 .dm-root .swatch .nm { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; padding: 0 2px; }
 .dm-root .swatch .nm kbd { font-family: var(--f-mono); font-size: 10px; color: var(--muted); }
 .dm-root .swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.dm-root .seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.dm-root .seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .dm-root .seg button { border: 0; background: var(--surface-2); padding: 7px 4px; font-size: 13px; color: var(--muted); }
 .dm-root .seg button + button { border-left: 1px solid var(--line); }
 .dm-root .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
