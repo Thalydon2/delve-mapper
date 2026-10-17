@@ -25,9 +25,9 @@ let activeId = 0, nextLayerId = 1;
 let cells = new Map();     // the selected layer's squares (editing tools write here)
 let walls = new Set();     // interior wall edges "h:x:y" / "v:x:y"
 let doors = new Set();
-const DEFAULT_STYLE = { bg: "hatch", depth: 1, wallW: 0.18, grid: true, shadow: true, ppc: opts.ppc || 70, ...(opts.defaultStyle || {}) };
+const DEFAULT_STYLE = { bg: "hatch", depth: 1, wallW: 0.18, grid: true, shadow: true, over: false, ppc: opts.ppc || 70, ...(opts.defaultStyle || {}) };
 let style = { ...DEFAULT_STYLE };   // map-wide: grid, ppc
-const LAYER_KEYS = ["bg", "depth", "wallW", "shadow"];
+const LAYER_KEYS = ["bg", "depth", "wallW", "shadow", "over"];
 const layerStyle = (src = DEFAULT_STYLE) => { const o = {}; for (const k of LAYER_KEYS) o[k] = src[k] ?? DEFAULT_STYLE[k]; return o; };
 const mapStyle = () => style;
 function makeLayer(name, st) { return { id: nextLayerId++, name, visible: true, style: layerStyle(st), cells: new Map(), cache: null }; }
@@ -527,8 +527,10 @@ function drawSurroundings(ctx, b, L) {
 
 function drawScene(ctx, b) {
   const vis = layers.filter(L => L.visible && L.cache);
-  for (const L of vis) drawSurroundings(ctx, b, L);   // all bands first, so a layer's band never covers another layer's floor
-  for (const L of vis) drawLayerBody(ctx, b, L);
+  // Normally every band goes down first, so one layer's band never covers another layer's floor.
+  // A layer set to "cover layers below" draws its band just before its own floor instead, on top of lower layers.
+  for (const L of vis) if (!L.style.over) drawSurroundings(ctx, b, L);
+  for (const L of vis) { if (L.style.over) drawSurroundings(ctx, b, L); drawLayerBody(ctx, b, L); }
   const s = CELL, W = (activeLayer() ? activeLayer().style.wallW : 0.18) * s;
   for (const p of props) if (PROPS[p.t] && PROPS[p.t].cat === "furn" && inB(b, p.x, p.y, 3)) drawProp(ctx, p);
   // doors
@@ -1117,6 +1119,7 @@ depth.addEventListener("input", () => { activeLayer().style.depth = +depth.value
 wallW.addEventListener("input", () => { activeLayer().style.wallW = +wallW.value; syncStyleUI(); changed(); });
 gridChk.addEventListener("change", () => { style.grid = gridChk.checked; syncStyleUI(); changed(); drawSwatches(); });
 $("shadowChk").addEventListener("change", e => { begin(); activeLayer().style.shadow = e.target.checked; changed(); });
+$("overChk").addEventListener("change", e => { begin(); activeLayer().style.over = e.target.checked; changed(); });
 function syncStyleUI() {
   const ls = activeLayer() ? activeLayer().style : layerStyle();
   root.querySelectorAll("[data-bg]").forEach(b => b.setAttribute("aria-pressed", b.dataset.bg === ls.bg));
@@ -1126,6 +1129,7 @@ function syncStyleUI() {
   $("layerStyleName").textContent = activeLayer() ? activeLayer().name : "";
   gridChk.checked = style.grid;
   $("shadowChk").checked = !!ls.shadow;
+  $("overChk").checked = !!ls.over;
   $("ppc").value = String(style.ppc);
 }
 
