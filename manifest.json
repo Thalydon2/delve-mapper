@@ -1,7 +1,7 @@
 {
   "id": "delve-mapper",
   "name": "Delve Mapper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "1.4.0",
   "description": "Draw grid dungeon and outdoor maps in your vault, with a PNG kept beside each map for notes and VTT scenes.",
   "author": "Austin",
