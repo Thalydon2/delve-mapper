@@ -622,17 +622,48 @@ Object.assign(PROPS, {
     lines(g, [0, -0.55 * C, 0, 0.05 * C, -0.15 * C, -0.35 * C, 0.15 * C, -0.35 * C], 1.1, "#d9c48d");
   } },
   bones: { name: "Bones", cat: "fol", group: "Temple & crypt", w: 1, h: 1, draw(g, seed) {
-    for (let i = 0; i < 2; i++) {
-      const a = h(seed, i, 70) * 6.283, x = (h(seed, i, 71) - 0.5) * 0.4 * C, y = (h(seed, i, 72) - 0.5) * 0.4 * C, dx = Math.cos(a) * 0.22 * C, dy = Math.sin(a) * 0.22 * C;
-      lines(g, [x - dx, y - dy, x + dx, y + dy], 2.6, PROP_INK); lines(g, [x - dx, y - dy, x + dx, y + dy], 1.4, "#eee8da");
-      for (const sg of [-1, 1]) disc(g, x + sg * dx, y + sg * dy, 0.04 * C, "#eee8da", 0.7);
+    // bone = shaft + two knuckles at each end; drawn twice (ink outline pass, then ivory fill) so the outline is one clean silhouette
+    const IVORY = "#ece5d3", parts = [];
+    const bone = (x, y, a, len, w) => {
+      const dx = Math.cos(a) * len / 2, dy = Math.sin(a) * len / 2, px = -Math.sin(a) * w * 0.55, py = Math.cos(a) * w * 0.55;
+      parts.push(["seg", x - dx, y - dy, x + dx, y + dy, w]);
+      for (const e of [-1, 1]) for (const k of [-1, 1]) parts.push(["dot", x + e * dx + k * px, y + e * dy + k * py, w * 0.62]);
+    };
+    for (let i = 0; i < 3; i++) {
+      const a = h(seed, i, 70) * 6.283, x = (h(seed, i, 71) - 0.5) * 0.45 * C, y = (h(seed, i, 72) - 0.5) * 0.45 * C;
+      bone(x, y, a, (0.42 + 0.14 * h(seed, i, 73)) * C, 0.07 * C);
     }
-    disc(g, 0.05 * C, -0.02 * C, 0.15 * C, "#eee8da", 1); disc(g, 0, -0.04 * C, 0.032 * C, PROP_INK, 0); disc(g, 0.1 * C, -0.04 * C, 0.032 * C, PROP_INK, 0);
+    const paint = (ink) => {
+      for (const p of parts) {
+        g.fillStyle = g.strokeStyle = ink ? PROP_INK : IVORY;
+        if (p[0] === "seg") { g.lineCap = "butt"; g.lineWidth = p[5] + (ink ? 2 : 0); g.beginPath(); g.moveTo(p[1], p[2]); g.lineTo(p[3], p[4]); g.stroke(); }
+        else { g.beginPath(); g.arc(p[1], p[2], p[3] + (ink ? 1 : 0), 0, 6.283); g.fill(); }
+      }
+    };
+    paint(true); paint(false);
+    // skull, seen from above: cranium, brow, eye sockets, nose, teeth
+    const sx = (h(seed, 9, 74) - 0.5) * 0.25 * C, sy = (h(seed, 9, 75) - 0.5) * 0.25 * C;
+    g.save(); g.translate(sx, sy); g.rotate((h(seed, 9, 76) - 0.5) * 1.2);
+    ell(g, 0, -0.02 * C, 0.17 * C, 0.19 * C, 0, IVORY, 1.1);
+    ell(g, 0, 0.15 * C, 0.1 * C, 0.06 * C, 0, IVORY, 1);
+    ell(g, -0.065 * C, 0.04 * C, 0.045 * C, 0.04 * C, 0, "#3a332c", 0); ell(g, 0.065 * C, 0.04 * C, 0.045 * C, 0.04 * C, 0, "#3a332c", 0);
+    polyF(g, [-0.02, 0.1, 0.02, 0.1, 0, 0.065], "#3a332c", 0);
+    lines(g, [-0.05 * C, 0.155 * C, 0.05 * C, 0.155 * C, -0.025 * C, 0.13 * C, -0.025 * C, 0.18 * C, 0.025 * C, 0.13 * C, 0.025 * C, 0.18 * C], 0.5, "#6b5f52");
+    g.restore();
   } },
-  gravestone: { name: "Gravestone", cat: "furn", group: "Temple & crypt", w: 1, h: 1, draw(g) {
-    ell(g, 0, 0.1 * C, 0.24 * C, 0.36 * C, 0, "#a99a7c", 0.8);
-    g.beginPath(); g.moveTo(-0.3 * C, -0.12 * C); g.lineTo(-0.3 * C, -0.3 * C); g.arc(0, -0.3 * C, 0.3 * C, Math.PI, 0); g.lineTo(0.3 * C, -0.12 * C); g.closePath();
-    g.fillStyle = "#b3ada2"; g.fill(); g.strokeStyle = PROP_INK; g.lineWidth = 1.2; g.stroke();
+  gravestone: { name: "Gravestone", cat: "furn", group: "Temple & crypt", w: 1, h: 2, draw(g, seed) {
+    // grave plot: low dirt mound with a few clods
+    g.beginPath(); g.roundRect ? g.roundRect(-0.32 * C, -0.42 * C, 0.64 * C, 1.28 * C, 0.2 * C) : g.rect(-0.32 * C, -0.42 * C, 0.64 * C, 1.28 * C);
+    g.fillStyle = "#8f7a5b"; g.fill(); g.strokeStyle = "rgba(40,30,20,.7)"; g.lineWidth = 0.9; g.stroke();
+    g.fillStyle = "rgba(60,45,30,.45)"; g.beginPath();
+    for (let i = 0; i < 7; i++) { const x = (h(seed, i, 120) - 0.5) * 0.45 * C, y = (-0.3 + h(seed, i, 121) * 1.05) * C, r = 0.6 + h(seed, i, 122) * 0.8; g.moveTo(x + r, y); g.arc(x, y, r, 0, 6.283); }
+    g.fill();
+    for (let i = 0; i < 3; i++) { const x = (h(seed, i, 123) - 0.5) * 0.4 * C, y = (0.1 + h(seed, i, 124) * 0.6) * C; lines(g, [x - 1.5, y, x, y - 3, x, y, x + 0.4, y - 3.6, x, y, x + 1.8, y - 2.4], 0.6, "#4f6b36"); }
+    // headstone: thick slab seen from above, with a shadow and a carved cross on the top edge
+    g.fillStyle = "rgba(30,25,20,.3)"; g.fillRect(-0.36 * C, -0.86 * C, 0.78 * C, 0.36 * C);
+    box(g, -0.4 * C, -0.92 * C, 0.8 * C, 0.34 * C, "#a7a297", 1.3);
+    box(g, -0.4 * C, -0.92 * C, 0.8 * C, 0.1 * C, "#c3beb3", 0.8);
+    lines(g, [0, -0.78 * C, 0, -0.62 * C, -0.07 * C, -0.73 * C, 0.07 * C, -0.73 * C], 1, "#5e5a52");
   } },
   // arcane & craft
   circle: { name: "Magic circle", cat: "furn", group: "Arcane & craft", w: 3, h: 3, draw(g) {
