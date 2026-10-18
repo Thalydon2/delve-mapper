@@ -78,12 +78,14 @@
 }
 .dm-root .sec { display: flex; flex-direction: column; gap: 10px; }
 .dm-root .sec h2 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 600; }
-.dm-root .swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dm-root .swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.dm-root .swatch { min-width: 0; }
 .dm-root .swatch {
   display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); text-align: left;
 }
 .dm-root .swatch canvas { width: 100%; aspect-ratio: 3 / 2; border-radius: 6px; display: block; }
-.dm-root .swatch .nm { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; padding: 0 2px; }
+.dm-root .swatch .nm { display: flex; justify-content: space-between; gap: 4px; font-size: 12px; font-weight: 500; padding: 0 2px; }
+.dm-root .swatch .nm > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .dm-root .swatch .nm kbd { font-family: var(--f-mono); font-size: 10px; color: var(--muted); }
 .dm-root .swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .dm-root .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
@@ -120,6 +122,7 @@
 .dm-root .app .layer-actions .btn { white-space: nowrap; padding: 0 10px; }
 .dm-root .app .btn:disabled { opacity: .4; cursor: default; }
 .dm-root .lsname { text-transform: none; letter-spacing: 0; color: var(--fg); font-weight: 600; }
+.dm-root .prop-groups { display: flex; flex-direction: column; gap: 10px; }
 .dm-root .props { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .dm-root .pbtn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 2px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-size: 11px; color: var(--muted); min-width: 0; }
 .dm-root .pbtn canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 5px; }

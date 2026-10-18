@@ -342,7 +342,136 @@ TEX.brick = {
     ctx.restore();
   }
 };
-const TEX_ORDER = ["plain", "flag", "wood", "dirt", "grass", "water", "cave", "brick"]; // order is saved in map files; append only
+TEX.marble = {
+  name: "Marble",
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL, t = CELL / 2;
+    for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
+      const gx = 2 * x + i, gy = 2 * y + j, dark = (gx + gy) & 1;
+      ctx.fillStyle = dark ? `hsl(35 6% ${66 + h(gx, gy, 1300) * 5}%)` : `hsl(40 14% ${90 + h(gx, gy, 1301) * 4}%)`;
+      ctx.fillRect(X + i * t, Y + j * t, t, t);
+      if (h(gx, gy, 1302) < 0.45) { // vein
+        ctx.strokeStyle = dark ? "rgba(255,255,255,.28)" : "rgba(110,100,90,.22)"; ctx.lineWidth = 0.5; ctx.beginPath();
+        const a = h(gx, gy, 1303) * t, b2 = h(gx, gy, 1304) * t;
+        ctx.moveTo(X + i * t, Y + j * t + a); ctx.bezierCurveTo(X + i * t + t * 0.4, Y + j * t + a - 4, X + i * t + t * 0.6, Y + j * t + b2 + 4, X + i * t + t, Y + j * t + b2); ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = "rgba(60,52,44,.35)"; ctx.lineWidth = 0.5; ctx.beginPath();
+    ctx.moveTo(X + t, Y); ctx.lineTo(X + t, Y + CELL); ctx.moveTo(X, Y + t); ctx.lineTo(X + CELL, Y + t); ctx.stroke();
+  }
+};
+TEX.cobble = {
+  name: "Cobblestone", outdoor: true, clip: true,
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL, n = 3, cs = CELL / n;
+    ctx.fillStyle = "#857d70"; ctx.fillRect(X, Y, CELL, CELL);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const gx = n * x + i, gy = n * y + j;
+      const cx = X + (i + 0.5) * cs + (h(gx, gy, 1310) - 0.5) * cs * 0.18, cy = Y + (j + 0.5) * cs + (h(gx, gy, 1311) - 0.5) * cs * 0.18;
+      const rx = cs * (0.4 + 0.06 * h(gx, gy, 1312)), ry = cs * (0.38 + 0.06 * h(gx, gy, 1313));
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, h(gx, gy, 1314) * 3, 0, 6.283);
+      ctx.fillStyle = `hsl(32 7% ${62 + h(gx, gy, 1315) * 14}%)`; ctx.fill();
+      ctx.strokeStyle = "rgba(45,38,32,.55)"; ctx.lineWidth = 0.6; ctx.stroke();
+    }
+  }
+};
+TEX.sand = {
+  name: "Sand", outdoor: true,
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL;
+    ctx.fillStyle = "#e4d3a7"; ctx.fillRect(X, Y, CELL, CELL);
+    ctx.strokeStyle = "rgba(160,125,70,.38)"; ctx.lineWidth = 0.7; ctx.lineCap = "round"; ctx.beginPath();
+    for (let i = 0; i < 2; i++) { // ripples line up across squares: same phase per row
+      const py = Y + (0.25 + 0.5 * i) * CELL + Math.sin((x + i) * 1.3) * 2;
+      ctx.moveTo(X, py); ctx.quadraticCurveTo(X + CELL / 2, py - 3 + h(x, y, 1320 + i) * 2, X + CELL, py + Math.sin((x + 1 + i) * 1.3) * 2 - Math.sin((x + i) * 1.3) * 2);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "rgba(140,110,60,.4)"; ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const px = X + h(x, y, 1330 + i) * CELL, py = Y + h(x, y, 1340 + i) * CELL; ctx.moveTo(px + 0.45, py); ctx.arc(px, py, 0.45, 0, 6.283); }
+    ctx.fill();
+  }
+};
+TEX.snow = {
+  name: "Snow", outdoor: true, clip: true,
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL;
+    ctx.fillStyle = "#eef2f5"; ctx.fillRect(X, Y, CELL, CELL);
+    for (let i = 0; i < 2; i++) { const px = X + h(x, y, 1350 + i) * CELL, py = Y + h(x, y, 1355 + i) * CELL; ctx.fillStyle = "rgba(150,175,200,.10)"; ctx.beginPath(); ctx.ellipse(px, py, 6 + h(x, y, 1360 + i) * 5, 3 + h(x, y, 1365 + i) * 2, 0.3, 0, 6.283); ctx.fill(); }
+    ctx.strokeStyle = "rgba(120,150,180,.35)"; ctx.lineWidth = 0.6; ctx.lineCap = "round"; ctx.beginPath();
+    if (h(x, y, 1370) < 0.5) { const px = X + h(x, y, 1371) * CELL * 0.7, py = Y + (0.2 + h(x, y, 1372) * 0.6) * CELL; ctx.moveTo(px, py); ctx.quadraticCurveTo(px + 5, py - 2, px + 10, py); }
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.beginPath();
+    for (let i = 0; i < 4; i++) { const px = X + h(x, y, 1380 + i) * CELL, py = Y + h(x, y, 1385 + i) * CELL; ctx.moveTo(px + 0.7, py); ctx.arc(px, py, 0.7, 0, 6.283); }
+    ctx.fill();
+  }
+};
+TEX.swamp = {
+  name: "Swamp", outdoor: true, clip: true,
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL;
+    ctx.fillStyle = "#7c875a"; ctx.fillRect(X, Y, CELL, CELL);
+    for (let i = 0; i < 2; i++) {
+      const px = X + h(x, y, 1400 + i) * CELL, py = Y + h(x, y, 1405 + i) * CELL;
+      ctx.fillStyle = "rgba(62,82,72,.55)"; ctx.beginPath(); ctx.ellipse(px, py, 6 + h(x, y, 1410 + i) * 6, 3 + h(x, y, 1415 + i) * 3, h(x, y, 1420 + i) * 3, 0, 6.283); ctx.fill();
+    }
+    ctx.fillStyle = "rgba(170,185,110,.7)"; ctx.beginPath();
+    for (let i = 0; i < 5; i++) { const px = X + h(x, y, 1430 + i) * CELL, py = Y + h(x, y, 1435 + i) * CELL, r = 0.6 + h(x, y, 1440 + i) * 0.8; ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, 6.283); }
+    ctx.fill();
+    ctx.strokeStyle = "rgba(55,70,40,.7)"; ctx.lineWidth = 0.6; ctx.lineCap = "round"; ctx.beginPath();
+    if (h(x, y, 1450) < 0.5) { const px = X + (0.2 + 0.6 * h(x, y, 1451)) * CELL, py = Y + (0.3 + 0.6 * h(x, y, 1452)) * CELL; ctx.moveTo(px, py); ctx.lineTo(px - 1.5, py - 5); ctx.moveTo(px, py); ctx.lineTo(px + 1, py - 6); ctx.moveTo(px, py); ctx.lineTo(px + 3, py - 4); }
+    ctx.stroke();
+  }
+};
+TEX.lava = {
+  name: "Lava", outdoor: true,
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL, I = 2 * x, J = 2 * y, P = (a, b) => lp(I + a, J + b);
+    ctx.fillStyle = "#f07a2a"; ctx.fillRect(X, Y, CELL, CELL);
+    const r = h(x, y, 1460);
+    const q = (a, b) => [P(a, b), P(a + 1, b), P(a + 1, b + 1), P(a, b + 1)];
+    const plates = r < 0.5 ? [q(0, 0), q(1, 0), q(0, 1), q(1, 1)] : [[P(0,0), P(1,0), P(2,0), P(2,1), P(1,1), P(0,1)], q(0, 1), q(1, 1)];
+    plates.forEach((pl, i) => {
+      if (h(x * 4 + i, y, 1461) < 0.18) return; // open molten patch
+      const c = pl.reduce((s, p) => [s[0] + p[0] / pl.length, s[1] + p[1] / pl.length], [0, 0]);
+      const shrunk = pl.map(p => [c[0] + (p[0] - c[0]) * 0.8, c[1] + (p[1] - c[1]) * 0.8]);
+      ctx.beginPath(); poly(ctx, shrunk); ctx.fillStyle = `hsl(14 18% ${17 + h(x * 4 + i, y, 1462) * 8}%)`; ctx.fill();
+      ctx.strokeStyle = "rgba(255,210,110,.55)"; ctx.lineWidth = 0.7; ctx.stroke();
+    });
+    ctx.fillStyle = "rgba(255,230,140,.75)"; ctx.beginPath();
+    for (let i = 0; i < 3; i++) { const px = X + h(x, y, 1470 + i) * CELL, py = Y + h(x, y, 1475 + i) * CELL; ctx.moveTo(px + 0.8, py); ctx.arc(px, py, 0.8, 0, 6.283); }
+    ctx.fill();
+  }
+};
+TEX.carpet = {
+  name: "Carpet", clip: true,
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL, t = CELL / 2;
+    ctx.fillStyle = "#8a2f33"; ctx.fillRect(X, Y, CELL, CELL);
+    ctx.strokeStyle = "rgba(226,180,110,.38)"; ctx.lineWidth = 0.8; ctx.beginPath(); // diamond lattice, continuous across squares
+    for (let k = 0; k <= 2; k++) { ctx.moveTo(X + k * t, Y); ctx.lineTo(X + k * t - t, Y + t); ctx.lineTo(X + k * t, Y + CELL); ctx.moveTo(X + k * t, Y); ctx.lineTo(X + k * t + t, Y + t); ctx.lineTo(X + k * t, Y + CELL); }
+    ctx.stroke();
+    ctx.fillStyle = "rgba(226,180,110,.45)"; ctx.beginPath();
+    for (const [a, b2] of [[0.5, 0.5], [0, 0], [1, 0], [0, 1], [1, 1]]) { ctx.moveTo(X + a * CELL + 1.2, Y + b2 * CELL); ctx.arc(X + a * CELL, Y + b2 * CELL, 1.2, 0, 6.283); }
+    ctx.fill();
+  }
+};
+TEX.forest = {
+  name: "Forest floor", outdoor: true, clip: true,
+  draw(ctx, x, y) {
+    const X = x * CELL, Y = y * CELL;
+    ctx.fillStyle = "#7d6c4c"; ctx.fillRect(X, Y, CELL, CELL);
+    const cols = ["#9a7a45", "#6f7a42", "#a4683a", "#5f5233", "#8c8a4c"];
+    for (let i = 0; i < 7; i++) {
+      const px = X + h(x, y, 1500 + i) * CELL, py = Y + h(x, y, 1510 + i) * CELL;
+      ctx.beginPath(); ctx.ellipse(px, py, 2.4, 1.2, h(x, y, 1520 + i) * 3.14, 0, 6.283);
+      ctx.fillStyle = cols[(h(x, y, 1530 + i) * 5) | 0]; ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(50,38,25,.6)"; ctx.lineWidth = 0.7; ctx.lineCap = "round"; ctx.beginPath();
+    if (h(x, y, 1540) < 0.45) { const px = X + h(x, y, 1541) * CELL * 0.7, py = Y + h(x, y, 1542) * CELL, a = h(x, y, 1543) * 3; ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * 8, py + Math.sin(a) * 8); }
+    ctx.stroke();
+  }
+};
+const TEX_ORDER = ["plain", "flag", "wood", "dirt", "grass", "water", "cave", "brick", "marble", "cobble", "sand", "snow", "swamp", "lava", "carpet", "forest"]; // order is saved in map files; append only
 
 // ---------- props ----------
 const PROP_INK = INK;
@@ -428,6 +557,185 @@ const PROPS = {
     for (let i = 0; i < 6; i++) { const x = (h(seed, i, 60) - 0.5) * 0.6 * C, y = (h(seed, i, 61) - 0.5) * 0.6 * C; disc(g, x, y, 0.06 * C, cols[(h(seed, i, 62) * 4) | 0], 0.6); }
   } },
 };
+const ell = (g, x, y, rx, ry, rot, fill, lw = 1.1) => { g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, 6.283); if (fill) { g.fillStyle = fill; g.fill(); } if (lw) { g.strokeStyle = PROP_INK; g.lineWidth = lw; g.stroke(); } };
+const polyF = (g, pts, fill, lw = 1.1) => { g.beginPath(); g.moveTo(pts[0] * C, pts[1] * C); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i] * C, pts[i + 1] * C); g.closePath(); if (fill) { g.fillStyle = fill; g.fill(); } if (lw) { g.strokeStyle = PROP_INK; g.lineWidth = lw; g.lineJoin = "round"; g.stroke(); } };
+const flame = (g, x, y, r) => { disc(g, x, y, r, "#e8823a", 0.6); disc(g, x, y, r * 0.5, "#fbd66a", 0); };
+Object.assign(PROPS, {
+  // tavern & town
+  bar: { name: "Bar counter", cat: "furn", group: "Tavern & town", w: 3, h: 1, draw(g) {
+    box(g, -1.45 * C, -0.32 * C, 2.9 * C, 0.64 * C, "#8b5c37"); box(g, -1.38 * C, -0.24 * C, 2.76 * C, 0.48 * C, "#a06c43", 0.6);
+    for (const x of [-1, -0.35, 0.5, 1.1]) disc(g, x * C, -0.05 * C, 0.08 * C, "#d9c48d", 0.8);
+  } },
+  stool: { name: "Stool", cat: "furn", group: "Tavern & town", w: 1, h: 1, draw(g) { disc(g, 0, 0, 0.2 * C, "#a8774a"); disc(g, 0, 0, 0.12 * C, null, 0.6); } },
+  fireplace: { name: "Fireplace", cat: "furn", group: "Tavern & town", w: 2, h: 1, draw(g) {
+    box(g, -0.95 * C, -0.5 * C, 1.9 * C, 0.62 * C, "#8c847a", 1.3);
+    lines(g, [-0.95 * C, -0.2 * C, -0.6 * C, -0.2 * C, 0.6 * C, -0.2 * C, 0.95 * C, -0.2 * C, -0.75 * C, -0.5 * C, -0.75 * C, -0.2 * C, 0.75 * C, -0.5 * C, 0.75 * C, -0.2 * C], 0.6, "rgba(40,34,28,.6)");
+    box(g, -0.55 * C, -0.38 * C, 1.1 * C, 0.42 * C, "#2b2522", 1);
+    flame(g, -0.15 * C, -0.15 * C, 0.13 * C); flame(g, 0.15 * C, -0.13 * C, 0.11 * C);
+  } },
+  well: { name: "Well", cat: "furn", group: "Tavern & town", w: 2, h: 2, draw(g) {
+    disc(g, 0, 0, 0.8 * C, "#a59d90", 1.4); disc(g, 0, 0, 0.56 * C, "#4f7f95", 1.2);
+    const p = []; for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; p.push(Math.cos(a) * 0.56 * C, Math.sin(a) * 0.56 * C, Math.cos(a) * 0.8 * C, Math.sin(a) * 0.8 * C); } lines(g, p, 0.7);
+    g.strokeStyle = "rgba(255,255,255,.6)"; g.lineWidth = 0.8; g.beginPath(); g.arc(-0.1 * C, -0.1 * C, 0.25 * C, 3.6, 4.6); g.stroke();
+    box(g, -0.9 * C, -0.06 * C, 1.8 * C, 0.12 * C, "#7a5536", 0.9);
+  } },
+  stall: { name: "Market stall", cat: "furn", group: "Tavern & town", w: 2, h: 2, draw(g) {
+    for (let i = 0; i < 6; i++) { g.fillStyle = i & 1 ? "#f1e6d2" : "#c45a46"; g.fillRect((-0.9 + i * 0.3) * C, -0.9 * C, 0.3 * C, 1.3 * C); }
+    g.strokeStyle = PROP_INK; g.lineWidth = 1.2; g.strokeRect(-0.9 * C, -0.9 * C, 1.8 * C, 1.3 * C);
+    box(g, -0.9 * C, 0.45 * C, 1.8 * C, 0.4 * C, "#a8774a");
+    const cols = ["#d9a441", "#8fb06c", "#c45a46", "#e8d9a8"];
+    for (let i = 0; i < 7; i++) disc(g, (-0.75 + i * 0.25) * C, 0.65 * C, 0.08 * C, cols[i % 4], 0.6);
+  } },
+  cart: { name: "Cart", cat: "furn", group: "Tavern & town", w: 1, h: 2, draw(g) {
+    box(g, -0.48 * C, -0.45 * C, 0.14 * C, 0.4 * C, "#3d332b"); box(g, 0.34 * C, -0.45 * C, 0.14 * C, 0.4 * C, "#3d332b");
+    box(g, -0.36 * C, -0.8 * C, 0.72 * C, 1.2 * C, "#a8774a");
+    lines(g, [-0.36 * C, -0.4 * C, 0.36 * C, -0.4 * C, -0.36 * C, 0, 0.36 * C, 0, -0.2 * C, 0.4 * C, -0.15 * C, 0.95 * C, 0.2 * C, 0.4 * C, 0.15 * C, 0.95 * C], 0.9);
+  } },
+  fence: { name: "Fence", cat: "furn", group: "Tavern & town", w: 1, h: 1, draw(g) {
+    box(g, -0.5 * C, -0.05 * C, C, 0.1 * C, "#a07a50", 0.8);
+    box(g, -0.5 * C, -0.1 * C, 0.14 * C, 0.2 * C, "#6a4a2f", 0.8); box(g, 0.36 * C, -0.1 * C, 0.14 * C, 0.2 * C, "#6a4a2f", 0.8);
+  } },
+  // temple & crypt
+  altar: { name: "Altar", cat: "furn", group: "Temple & crypt", w: 2, h: 1, draw(g) {
+    box(g, -0.9 * C, -0.36 * C, 1.8 * C, 0.72 * C, "#dcd6ca", 1.4); box(g, -0.22 * C, -0.36 * C, 0.44 * C, 0.72 * C, "#6e3a63", 0.8);
+    flame(g, -0.65 * C, 0, 0.08 * C); flame(g, 0.65 * C, 0, 0.08 * C);
+  } },
+  statue: { name: "Statue", cat: "furn", group: "Temple & crypt", w: 1, h: 1, draw(g) {
+    box(g, -0.42 * C, -0.42 * C, 0.84 * C, 0.84 * C, "#c3bdb1", 1.3);
+    ell(g, 0, 0.06 * C, 0.3 * C, 0.15 * C, 0, "#e3ded4"); disc(g, 0, -0.05 * C, 0.13 * C, "#ece8df");
+  } },
+  pew: { name: "Pew", cat: "furn", group: "Temple & crypt", w: 3, h: 1, draw(g) {
+    box(g, -1.4 * C, -0.2 * C, 2.8 * C, 0.32 * C, "#9a6a42"); box(g, -1.4 * C, 0.12 * C, 2.8 * C, 0.12 * C, "#6e4a2c");
+    box(g, -1.45 * C, -0.24 * C, 0.08 * C, 0.5 * C, "#6e4a2c", 0.8); box(g, 1.37 * C, -0.24 * C, 0.08 * C, 0.5 * C, "#6e4a2c", 0.8);
+  } },
+  candelabra: { name: "Candelabra", cat: "furn", group: "Temple & crypt", w: 1, h: 1, draw(g) {
+    disc(g, 0, 0, 0.14 * C, "#8a8278", 1); lines(g, [0, 0, 0, -0.22 * C, 0, 0, -0.2 * C, 0.12 * C, 0, 0, 0.2 * C, 0.12 * C], 1.2, "#5d564d");
+    flame(g, 0, -0.24 * C, 0.08 * C); flame(g, -0.21 * C, 0.13 * C, 0.08 * C); flame(g, 0.21 * C, 0.13 * C, 0.08 * C);
+  } },
+  sarcophagus: { name: "Sarcophagus", cat: "furn", group: "Temple & crypt", w: 1, h: 2, draw(g) {
+    box(g, -0.42 * C, -0.9 * C, 0.84 * C, 1.8 * C, "#bdb6a8", 1.4); box(g, -0.32 * C, -0.8 * C, 0.64 * C, 1.6 * C, "#cec8bb", 0.7);
+    disc(g, 0, -0.5 * C, 0.13 * C, "#d9d3c7", 0.8); ell(g, 0, 0.1 * C, 0.17 * C, 0.5 * C, 0, "#d9d3c7", 0.8);
+    lines(g, [-0.15 * C, -0.05 * C, 0.15 * C, -0.05 * C], 0.7);
+  } },
+  coffin: { name: "Coffin", cat: "furn", group: "Temple & crypt", w: 1, h: 2, draw(g) {
+    polyF(g, [-0.24, -0.9, 0.24, -0.9, 0.38, -0.45, 0.28, 0.9, -0.28, 0.9, -0.38, -0.45], "#7a5536", 1.3);
+    lines(g, [0, -0.55 * C, 0, 0.05 * C, -0.15 * C, -0.35 * C, 0.15 * C, -0.35 * C], 1.1, "#d9c48d");
+  } },
+  bones: { name: "Bones", cat: "fol", group: "Temple & crypt", w: 1, h: 1, draw(g, seed) {
+    for (let i = 0; i < 2; i++) {
+      const a = h(seed, i, 70) * 6.283, x = (h(seed, i, 71) - 0.5) * 0.4 * C, y = (h(seed, i, 72) - 0.5) * 0.4 * C, dx = Math.cos(a) * 0.22 * C, dy = Math.sin(a) * 0.22 * C;
+      lines(g, [x - dx, y - dy, x + dx, y + dy], 2.6, PROP_INK); lines(g, [x - dx, y - dy, x + dx, y + dy], 1.4, "#eee8da");
+      for (const sg of [-1, 1]) disc(g, x + sg * dx, y + sg * dy, 0.04 * C, "#eee8da", 0.7);
+    }
+    disc(g, 0.05 * C, -0.02 * C, 0.15 * C, "#eee8da", 1); disc(g, 0, -0.04 * C, 0.032 * C, PROP_INK, 0); disc(g, 0.1 * C, -0.04 * C, 0.032 * C, PROP_INK, 0);
+  } },
+  gravestone: { name: "Gravestone", cat: "furn", group: "Temple & crypt", w: 1, h: 1, draw(g) {
+    ell(g, 0, 0.1 * C, 0.24 * C, 0.36 * C, 0, "#a99a7c", 0.8);
+    g.beginPath(); g.moveTo(-0.3 * C, -0.12 * C); g.lineTo(-0.3 * C, -0.3 * C); g.arc(0, -0.3 * C, 0.3 * C, Math.PI, 0); g.lineTo(0.3 * C, -0.12 * C); g.closePath();
+    g.fillStyle = "#b3ada2"; g.fill(); g.strokeStyle = PROP_INK; g.lineWidth = 1.2; g.stroke();
+  } },
+  // arcane & craft
+  circle: { name: "Magic circle", cat: "furn", group: "Arcane & craft", w: 3, h: 3, draw(g) {
+    g.fillStyle = "rgba(120,90,180,.10)"; g.beginPath(); g.arc(0, 0, 1.35 * C, 0, 6.283); g.fill();
+    g.strokeStyle = "#5e468f"; g.lineWidth = 1.3; g.beginPath(); g.arc(0, 0, 1.35 * C, 0, 6.283); g.stroke(); g.beginPath(); g.arc(0, 0, 1.12 * C, 0, 6.283); g.stroke();
+    g.lineWidth = 1; g.beginPath();
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 4 * Math.PI / 5; g[i ? "lineTo" : "moveTo"](Math.cos(a) * 1.1 * C, Math.sin(a) * 1.1 * C); } g.closePath(); g.stroke();
+    g.lineWidth = 0.8; g.beginPath();
+    for (let i = 0; i < 20; i++) { const a = i / 20 * 6.283, r1 = 1.17 * C, r2 = 1.3 * C, m = i % 3; g.moveTo(Math.cos(a) * r1, Math.sin(a) * r1); g.lineTo(Math.cos(a + (m - 1) * 0.04) * r2, Math.sin(a + (m - 1) * 0.04) * r2); }
+    g.stroke();
+  } },
+  cauldron: { name: "Cauldron", cat: "furn", group: "Arcane & craft", w: 1, h: 1, draw(g) {
+    disc(g, 0, 0, 0.35 * C, "#2e2b28", 1.4); disc(g, 0, 0, 0.26 * C, "#5d9a40", 0.8);
+    disc(g, -0.08 * C, -0.05 * C, 0.05 * C, "#9fd07a", 0); disc(g, 0.09 * C, 0.06 * C, 0.035 * C, "#9fd07a", 0);
+  } },
+  desk: { name: "Desk", cat: "furn", group: "Arcane & craft", w: 2, h: 1, draw(g) {
+    box(g, -0.9 * C, -0.35 * C, 1.8 * C, 0.7 * C, "#8b5c37");
+    g.save(); g.rotate(-0.15); box(g, -0.55 * C, -0.2 * C, 0.36 * C, 0.44 * C, "#f2ecdc", 0.7); g.restore();
+    box(g, 0.05 * C, -0.2 * C, 0.42 * C, 0.3 * C, "#3f5f7a", 0.8); lines(g, [0.26 * C, -0.2 * C, 0.26 * C, 0.1 * C], 0.7);
+    flame(g, 0.7 * C, -0.15 * C, 0.07 * C);
+  } },
+  anvil: { name: "Anvil", cat: "furn", group: "Arcane & craft", w: 1, h: 1, draw(g) {
+    box(g, -0.18 * C, -0.2 * C, 0.36 * C, 0.4 * C, "#6d5038", 0.9);
+    polyF(g, [-0.45, 0, -0.14, -0.13, 0.32, -0.13, 0.32, 0.13, -0.14, 0.13], "#5d6166", 1.2);
+  } },
+  forge: { name: "Forge", cat: "furn", group: "Arcane & craft", w: 2, h: 2, draw(g) {
+    box(g, -0.9 * C, -0.9 * C, 1.8 * C, 1.8 * C, "#8c847a", 1.4); box(g, -0.55 * C, -0.55 * C, 1.1 * C, 1.1 * C, "#2b2522", 1);
+    for (let i = 0; i < 9; i++) disc(g, (-0.35 + (i % 3) * 0.35) * C, (-0.35 + ((i / 3) | 0) * 0.35) * C, 0.13 * C, i % 2 ? "#c9471f" : "#f08a2e", 0);
+    flame(g, 0, 0, 0.16 * C);
+  } },
+  rack: { name: "Weapon rack", cat: "furn", group: "Arcane & craft", w: 2, h: 1, draw(g) {
+    box(g, -0.9 * C, -0.35 * C, 1.8 * C, 0.14 * C, "#6a4a2f", 1);
+    for (const x of [-0.6, -0.2, 0.2]) { lines(g, [x * C, -0.42 * C, x * C, 0.35 * C], 2.2, PROP_INK); lines(g, [x * C, -0.42 * C, x * C, 0.35 * C], 1.1, "#c9ccd1"); lines(g, [(x - 0.1) * C, -0.12 * C, (x + 0.1) * C, -0.12 * C], 1.6, "#8a6a3e"); }
+    lines(g, [0.6 * C, -0.42 * C, 0.6 * C, 0.4 * C], 1.4, "#7a5536"); polyF(g, [0.6, 0.15, 0.78, 0.05, 0.8, 0.35, 0.6, 0.3], "#aeb2b8", 0.9);
+  } },
+  // wilderness
+  campfire: { name: "Campfire", cat: "furn", group: "Wilderness", w: 1, h: 1, draw(g) {
+    for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; disc(g, Math.cos(a) * 0.32 * C, Math.sin(a) * 0.32 * C, 0.08 * C, "#9b958a", 0.8); }
+    lines(g, [-0.2 * C, -0.12 * C, 0.2 * C, 0.12 * C, -0.2 * C, 0.12 * C, 0.2 * C, -0.12 * C], 2.6, "#5c4127");
+    flame(g, 0, 0, 0.15 * C);
+  } },
+  tent: { name: "Tent", cat: "furn", group: "Wilderness", w: 2, h: 2, draw(g) {
+    box(g, -0.8 * C, -0.8 * C, 1.6 * C, 1.6 * C, "#bba77f", 1.3);
+    g.fillStyle = "rgba(60,45,25,.18)"; g.fillRect(0, -0.8 * C, 0.8 * C, 1.6 * C);
+    lines(g, [0, -0.8 * C, 0, 0.8 * C], 1.2);
+    polyF(g, [-0.22, 0.8, 0, 0.45, 0.22, 0.8], "#7d6a48", 1);
+  } },
+  bedroll: { name: "Bedroll", cat: "furn", group: "Wilderness", w: 1, h: 2, draw(g) {
+    g.beginPath(); g.roundRect ? g.roundRect(-0.3 * C, -0.8 * C, 0.6 * C, 1.55 * C, 0.12 * C) : g.rect(-0.3 * C, -0.8 * C, 0.6 * C, 1.55 * C);
+    g.fillStyle = "#6f7f5a"; g.fill(); g.strokeStyle = PROP_INK; g.lineWidth = 1.1; g.stroke();
+    box(g, -0.24 * C, -0.74 * C, 0.48 * C, 0.26 * C, "#e8dfca", 0.8); lines(g, [-0.3 * C, 0.3 * C, 0.3 * C, 0.3 * C, -0.3 * C, 0.5 * C, 0.3 * C, 0.5 * C], 0.8, "#4a3b2e");
+  } },
+  pit: { name: "Pit", cat: "furn", group: "Wilderness", w: 1, h: 1, draw(g, seed) {
+    blobPath(g, 0.48 * C, seed, 8); g.fillStyle = "#6a645b"; g.fill(); g.strokeStyle = PROP_INK; g.lineWidth = 1.1; g.stroke();
+    blobPath(g, 0.36 * C, seed + 3, 8, 3); g.fillStyle = "#151210"; g.fill();
+  } },
+  deadtree: { name: "Dead tree", cat: "fol", group: "Wilderness", w: 2, h: 2, draw(g, seed) {
+    const br = (x, y, a, len, w, d) => {
+      const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
+      lines(g, [x, y, x2, y2], w + 1.4, PROP_INK); lines(g, [x, y, x2, y2], w, "#7a6248");
+      if (d > 0) for (const s of [-1, 1]) br(x2, y2, a + s * (0.35 + 0.3 * h(seed, d * 7 + s, Math.round(a * 10))), len * 0.6, w * 0.6, d - 1);
+    };
+    const n = 5; for (let i = 0; i < n; i++) br(0, 0, i / n * 6.283 + h(seed, i, 80) * 0.6, 0.42 * C, 2.4, 2);
+    disc(g, 0, 0, 0.14 * C, "#6a5340", 1.2);
+  } },
+  cactus: { name: "Cactus", cat: "fol", group: "Wilderness", w: 1, h: 1, draw(g, seed) {
+    disc(g, 0.22 * C, -0.1 * C, 0.1 * C, "#6f9a52", 1); disc(g, -0.2 * C, 0.14 * C, 0.09 * C, "#6f9a52", 1);
+    disc(g, 0, 0, 0.2 * C, "#7aa65a", 1.2);
+    const p = []; for (let i = 0; i < 8; i++) { const a = i / 8 * 6.283; p.push(Math.cos(a) * 0.05 * C, Math.sin(a) * 0.05 * C, Math.cos(a) * 0.18 * C, Math.sin(a) * 0.18 * C); } lines(g, p, 0.6, "rgba(40,70,30,.8)");
+  } },
+  reeds: { name: "Reeds", cat: "fol", group: "Wilderness", w: 1, h: 1, draw(g, seed) {
+    for (let i = 0; i < 7; i++) {
+      const a = -Math.PI / 2 + (h(seed, i, 90) - 0.5) * 1.6, l = (0.3 + 0.2 * h(seed, i, 91)) * C, x = (h(seed, i, 92) - 0.5) * 0.2 * C;
+      lines(g, [x, 0.25 * C, x + Math.cos(a) * l, 0.25 * C + Math.sin(a) * l], 1, "#4f6b36");
+      if (i % 2 === 0) ell(g, x + Math.cos(a) * l, 0.25 * C + Math.sin(a) * l, 0.035 * C, 0.07 * C, a + Math.PI / 2, "#6e4a2c", 0.6);
+    }
+  } },
+  mushrooms: { name: "Mushrooms", cat: "fol", group: "Wilderness", w: 1, h: 1, draw(g, seed) {
+    for (let i = 0; i < 4; i++) {
+      const x = (h(seed, i, 100) - 0.5) * 0.55 * C, y = (h(seed, i, 101) - 0.5) * 0.55 * C, r = (0.09 + 0.09 * h(seed, i, 102)) * C;
+      disc(g, x, y, r, h(seed, 0, 103) < 0.5 ? "#c4483c" : "#c9a46a", 0.9);
+      disc(g, x - r * 0.3, y - r * 0.3, r * 0.22, "#f4ecdc", 0); disc(g, x + r * 0.35, y + r * 0.1, r * 0.16, "#f4ecdc", 0);
+    }
+  } },
+  stalagmite: { name: "Stalagmite", cat: "fol", group: "Wilderness", w: 1, h: 1, draw(g, seed) {
+    blobPath(g, 0.4 * C, seed, 7); g.fillStyle = "#8e8779"; g.fill(); g.strokeStyle = PROP_INK; g.lineWidth = 1.1; g.stroke();
+    blobPath(g, 0.25 * C, seed + 2, 6, 3); g.fillStyle = "#a9a294"; g.fill();
+    disc(g, 0.02 * C, -0.02 * C, 0.09 * C, "#c4beb1", 0.7);
+  } },
+  crystals: { name: "Crystals", cat: "fol", group: "Wilderness", w: 1, h: 1, draw(g, seed) {
+    const col = h(seed, 0, 110) < 0.5 ? ["#9fd3e8", "#d8f1fa"] : ["#b79fe8", "#e6dbfb"];
+    for (let i = 0; i < 4; i++) {
+      const a = i / 4 * 6.283 + h(seed, i, 111) * 0.8, l = (0.25 + 0.15 * h(seed, i, 112)), w = 0.08;
+      g.save(); g.rotate(a);
+      polyF(g, [0, -w, l - 0.06, -w, l, 0, l - 0.06, w, 0, w], col[0], 1);
+      lines(g, [0, 0, (l - 0.02) * C, 0], 0.6, col[1]);
+      g.restore();
+    }
+    disc(g, 0, 0, 0.08 * C, col[0], 1);
+  } },
+});
+const PROP_GROUPS = ["Furniture", "Tavern & town", "Temple & crypt", "Arcane & craft", "Wilderness", "Foliage"];
+const propGroup = P => P.group || (P.cat === "fol" ? "Foliage" : "Furniture");
 const PROP_ORDER = Object.keys(PROPS);
 function drawProp(g, p, alpha = 1) {
   const P = PROPS[p.t]; if (!P) return;
@@ -548,7 +856,12 @@ function drawScene(ctx, b) {
 function drawLayerBody(ctx, b, L) {
   const s = CELL, style = L.style, { floorList, wallEdges, shoreEdges, isFloor } = L.cache;
   const isIndoor = isFloor;
-  for (const f of floorList) if (inB(b, f.x, f.y)) TEX[f.t].draw(ctx, f.x, f.y);
+  for (const f of floorList) {
+    if (!inB(b, f.x, f.y)) continue;
+    const T = TEX[f.t];
+    if (T.clip) { ctx.save(); ctx.beginPath(); ctx.rect(f.x * s, f.y * s, s, s); ctx.clip(); T.draw(ctx, f.x, f.y); ctx.restore(); }
+    else T.draw(ctx, f.x, f.y);
+  }
 
   if (mapStyle().grid) {
     ctx.strokeStyle = "rgba(55,45,35,.22)"; ctx.lineWidth = 0.6; ctx.lineCap = "butt"; ctx.beginPath();
@@ -975,7 +1288,7 @@ styleToggle.addEventListener("click", () => { const o = panel.classList.toggle("
 const swWrap = $("swatches");
 TEX_ORDER.forEach((t, i) => {
   const b = document.createElement("button"); b.className = "swatch"; b.dataset.tex = t;
-  b.innerHTML = '<canvas width="180" height="120"></canvas><span class="nm"><span>' + TEX[t].name + "</span><kbd>" + (i + 1) + "</kbd></span>";
+  b.innerHTML = '<canvas width="180" height="120"></canvas><span class="nm"><span>' + TEX[t].name + "</span>" + (i < 10 ? "<kbd>" + ((i + 1) % 10) + "</kbd>" : "") + "</span>";
   b.addEventListener("click", () => setTex(t));
   swWrap.appendChild(b);
 });
@@ -985,7 +1298,7 @@ function drawSwatches() {
     g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = PAPER; g.fillRect(0, 0, c.width, c.height);
     const sc = c.width / (CELL * 3), ox = 20, oy = 40 + n * 5; // sample a patch of the real texture field
     g.setTransform(sc, 0, 0, sc, -ox * CELL * sc, -oy * CELL * sc);
-    for (let y = 0; y < 2; y++) for (let x = 0; x < 3; x++) TEX[t].draw(g, ox + x, oy + y);
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 3; x++) { g.save(); g.beginPath(); g.rect((ox + x) * CELL, (oy + y) * CELL, CELL, CELL); g.clip(); TEX[t].draw(g, ox + x, oy + y); g.restore(); }
     if (style.grid) {
       g.strokeStyle = "rgba(55,45,35,.22)"; g.lineWidth = 0.6; g.beginPath();
       for (let x = 1; x < 3; x++) { g.moveTo((ox + x) * CELL, oy * CELL); g.lineTo((ox + x) * CELL, (oy + 2) * CELL); }
@@ -1067,16 +1380,21 @@ $("layerDel").addEventListener("click", () => {
 
 // prop palette
 function buildPropPalette() {
-  const furn = $("propsFurn"), fol = $("propsFol");
+  const wrap = $("propGroups"), grids = {};
+  for (const name of PROP_GROUPS) {
+    const sub = document.createElement("p"); sub.className = "sub"; sub.textContent = name;
+    const grid = document.createElement("div"); grid.className = "props";
+    wrap.append(sub, grid); grids[name] = grid;
+  }
   PROP_ORDER.forEach(t => {
     const P = PROPS[t], b = document.createElement("button");
     b.className = "pbtn"; b.dataset.prop = t; b.title = P.name;
     b.innerHTML = '<canvas width="96" height="96"></canvas><span>' + P.name + "</span>";
     const c = b.querySelector("canvas"), g = c.getContext("2d"), m = Math.max(P.w, P.h), sc = 96 / (CELL * (m + 0.3));
-    g.fillStyle = P.cat === "fol" ? "#b9cc98" : PAPER; g.fillRect(0, 0, 96, 96);
+    g.fillStyle = propGroup(P) === "Foliage" ? "#b9cc98" : P.group === "Wilderness" ? "#d8ccb0" : PAPER; g.fillRect(0, 0, 96, 96);
     g.setTransform(sc, 0, 0, sc, 48, 48); P.draw(g, 11 + PROP_ORDER.indexOf(t));
     b.addEventListener("click", () => { setProp(t); setTool("prop"); if (root.clientWidth < 820) { panel.classList.remove("open"); styleToggle.setAttribute("aria-expanded", false); styleToggle.setAttribute("aria-pressed", false); } });
-    (P.cat === "fol" ? fol : furn).appendChild(b);
+    grids[propGroup(P)].appendChild(b);
   });
 }
 function setProp(t) { curProp = t; root.querySelectorAll("[data-prop]").forEach(b => b.setAttribute("aria-pressed", b.dataset.prop === t)); updateHud(); }
@@ -1193,7 +1511,7 @@ const onKeyDown = e => {
   const map = { r: "room", b: "brush", e: "erase", w: "wall", d: "door", p: "prop", h: "pan" };
   e.stopPropagation();
   if (map[k]) setTool(map[k]);
-  else if (k >= "1" && k <= "8") setTex(TEX_ORDER[+k - 1]);
+  else if (k >= "0" && k <= "9" && k.length === 1) setTex(TEX_ORDER[(+k + 9) % 10]);
   else if (k === "]" || k === "}") rotateSel(1, e.shiftKey ? 90 : 15);
   else if (k === "[" || k === "{") rotateSel(-1, e.shiftKey ? 90 : 15);
   else if ((k === "delete" || k === "backspace") && selected) { e.preventDefault(); deleteSel(); }
